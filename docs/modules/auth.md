@@ -6,7 +6,8 @@ Bog'liq qarorlar: DECISIONS.md → R-001…R-006, A-001…A-015.
 
 | Bo'lim | Vazifasi | Backend resursi |
 |---|---|---|
-| Xodimlar | Xodim qo'shish/tahrirlash: ism, familiya, tug'ilgan sana, jins, telefon | `employees` |
+| Rollar | 6 ta rol ro'yxati (faqat ko'rish) | `GET /roles` |
+| Xodimlar | Xodim qo'shish/tahrirlash: ism, familiya, tug'ilgan sana, jins, telefon, lavozim, maosh, rasm | `employees` |
 | Lavozimlar | Xodimga rol berish | `PUT /employees/{id}/role` |
 | Parollar | Xodimga (yoki ta'minotchiga) username va parol berish, parolni almashtirish, blokni ochish | `accounts` |
 | Mening sahifam | Har bir foydalanuvchi o'z profilini ko'radi (faqat ko'rish) | `GET /auth/me` |
@@ -14,16 +15,35 @@ Bog'liq qarorlar: DECISIONS.md → R-001…R-006, A-001…A-015.
 ## 2. Jadvallar
 
 ### employees
+Hamma maydon majburiy (E-001). Anonimlashtirilgan xodimda telefon va rasm bo'sh bo'lishi mumkin (E-009) — `CHECK contacts_required`.
+
 | Ustun | Tur | Izoh |
 |---|---|---|
 | id | bigint identity | |
 | first_name, last_name | varchar(100) | |
-| birth_date | date, null | |
+| birth_date | date | yosh shundan hisoblanadi |
 | gender | varchar + CHECK (male/female) | |
-| phone | varchar(20), null | |
-| role | varchar + CHECK (6 ta rol) , null | null = hali lavozim berilmagan |
-| created_at, updated_at, deleted_at | timestamptz | |
-| created_by_id, updated_by_id | bigint → user_accounts | |
+| phone | varchar(13), unique, null | `+998XXXXXXXXX` formatida saqlanadi (E-011) |
+| role | varchar + CHECK | superadmin, admin, kassir, omborchi, buxgalter (ta'minotchi xodim emas) |
+| salary | numeric(14,2) + CHECK ≥ 0 | oylik maosh |
+| photo_path | varchar(255), null | `media/` ichidagi nisbiy yo'l (E-012) |
+| archived_at | timestamptz, null | arxivlangan bo'lsa (E-005) |
+| anonymized_at | timestamptz, null | "o'chirilgan" bo'lsa (E-009) |
+| created_at, updated_at | timestamptz | |
+
+### employee_positions
+Lavozim va maosh tarixi (E-010).
+
+| Ustun | Tur | Izoh |
+|---|---|---|
+| id | bigint identity | |
+| employee_id | FK → employees, RESTRICT | |
+| role | varchar + CHECK | |
+| salary | numeric(14,2) + CHECK ≥ 0 | |
+| valid_from | date | qaysi kundan |
+| valid_to | date, null | qaysi kungacha (null = joriy); CHECK ≥ valid_from |
+
+Partial unique index: xodimda `valid_to IS NULL` davr bittadan ko'p bo'lmaydi.
 
 ### user_accounts
 | Ustun | Tur | Izoh |
@@ -61,13 +81,20 @@ Bog'liq qarorlar: DECISIONS.md → R-001…R-006, A-001…A-015.
 | POST | /api/v1/auth/refresh | cookie egasi | yangi access + yangi refresh (rotation) |
 | POST | /api/v1/auth/logout | login bo'lgan | joriy sessiyani yopadi |
 | GET | /api/v1/auth/me | login bo'lgan | o'z profili |
-| GET/POST | /api/v1/employees | superadmin, admin | ro'yxat (qidiruv, filtr: rol, sana) / yaratish |
-| GET/PATCH/DELETE | /api/v1/employees/{id} | superadmin, admin | |
-| PUT | /api/v1/employees/{id}/role | superadmin, admin | lavozim berish/o'zgartirish |
-| GET/POST | /api/v1/accounts | superadmin, admin | parollar ro'yxati (qidiruv: ism, rol; filtr: rol, sana) / akkaunt yaratish |
-| POST | /api/v1/accounts/{id}/reset-password | superadmin, admin | yangi parol |
-| POST | /api/v1/accounts/{id}/unlock | superadmin, admin | doimiy blokni ochish |
-| DELETE | /api/v1/accounts/{id} | superadmin, admin | akkauntni o'chirish (kira olmaydi, tarix qoladi) |
+| GET | /api/v1/roles | superadmin, admin | lavozimlar ma'lumotnomasi (xodimlar soni bilan) |
+| GET | /api/v1/employees | superadmin, admin | ro'yxat: `status` (active/archived), `search`, `role`, `created_from/to`, `page`, `size` |
+| POST | /api/v1/employees | superadmin, admin | yaratish (multipart forma + `photo`) |
+| GET/PATCH/DELETE | /api/v1/employees/{id} | superadmin, admin | kartochka / shaxsiy ma'lumotlar / o'chirish (E-009) |
+| PUT | /api/v1/employees/{id}/photo | superadmin, admin | rasmni almashtirish |
+| POST | /api/v1/employees/{id}/position | superadmin, admin | lavozim/maosh o'zgarishi (E-010) |
+| GET | /api/v1/employees/{id}/positions | superadmin, admin | lavozim va maosh tarixi |
+| POST | /api/v1/employees/{id}/archive, /restore | superadmin, admin | arxivlash / qaytarish (E-005) |
+| GET | /api/v1/accounts | superadmin, admin | ro'yxat: `status` (active/locked/deleted), `search` (username yoki ism), `role`, `created_from/to`, `page`, `size`; har qatorda `state` va `locked_until` (A-031) |
+| POST | /api/v1/accounts | superadmin, admin | login yaratish: `employee_id`, `username`, `password`, `password_confirm` (A-027, A-028) |
+| GET | /api/v1/accounts/{id} | superadmin, admin | login kartochkasi |
+| POST | /api/v1/accounts/{id}/reset-password | superadmin, admin | yangi parol + tasdiqlash; barcha sessiyalar yopiladi |
+| POST | /api/v1/accounts/{id}/unlock | superadmin, admin | doimiy va vaqtincha blokni ochish |
+| DELETE | /api/v1/accounts/{id} | superadmin, admin | loginni o'chirish (qaytarilmaydi, A-029; xodim va tarix qoladi) |
 
 Admin uchun barcha endpoint'larda: superadmin ko'rinmaydi va o'zgartirilmaydi; admin akkauntlari o'zgartirilmaydi.
 
@@ -97,9 +124,11 @@ Cookie'dagi token hash bo'yicha topiladi →
 | Amal | Natija |
 |---|---|
 | Parolni almashtirish | token_version +1, barcha sessiyalar yopiladi, audit |
-| Lavozimni o'zgartirish | token_version +1, barcha sessiyalar yopiladi, audit |
+| Lavozimni o'zgartirish | eski davr yopiladi, yangisi ochiladi; token_version +1, barcha sessiyalar yopiladi, audit |
+| Faqat maoshni o'zgartirish | yangi davr ochiladi; sessiyalar yopilmaydi |
+| Xodimni arxivlash | barcha sessiyalar yopiladi, login ishlamaydi; qaytarilsa — ishlaydi |
 | Akkauntni o'chirish | sessiyalar yopiladi; xodim va tarix qoladi |
-| Xodimni o'chirish | akkaunt ham o'chiriladi; tarix qoladi |
+| Xodimni o'chirish | tarixi yo'q → butunlay; bor → anonimlashtiriladi, akkauntlar o'chiriladi, tarix qoladi (E-009) |
 | Blokni ochish | is_locked=false, hisoblagichlar tozalanadi, audit |
 
 ## 5. Lockout (Redis)

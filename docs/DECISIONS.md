@@ -44,14 +44,49 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | A-005 | Refresh token 24 soat, **logindan boshlab mutlaq** (rotation muddatni uzaytirmaydi), httpOnly cookie |
 | A-006 | Refresh token rotation; eski token qayta ishlatilsa — akkauntning barcha sessiyalari yopiladi |
 | A-007 | Parol yoki lavozim o'zgarsa `token_version` oshadi → barcha qurilmalardan chiqariladi. Tarix (savdo, oylik) saqlanadi |
-| A-008 | Parol hech qachon ko'rsatilmaydi; admin faqat yangi parol qo'yadi |
-| A-009 | Parol kamida 4 belgi |
+| A-008 | Parol hech qachon ko'rsatilmaydi; admin faqat yangi parol qo'yadi (dastlabki promptdagi "ko'z tugmasi" talabi xavfsizlik sababli bekor qilindi) |
+| A-009 | Parol kamida 4 belgi (batafsil: A-017) |
 | A-010 | Username kichik harfda, unikal, **qayta ishlatilmaydi** (ketgan xodimning username'i yangi xodimga berilmaydi) |
 | A-011 | Lockout: 5 ketma-ket xato yoki 1 daqiqada 5+ urinish → 10 daqiqa blok. Shundan keyin 3 xato → doimiy blok (admin ochadi; superadmin'ni faqat server buyrug'i ochadi). Faol sessiyalar uzilmaydi |
 | A-012 | Profil faqat ko'rish uchun; barcha ma'lumotlarni (telefon ham) admin kiritadi |
 | A-013 | Superadmin kodda emas — CLI buyrug'i bilan yaratiladi |
 | A-014 | Bir kassir bir vaqtda bitta joyda: yangi login eski sessiyani yopadi |
 | A-015 | Bir kassada bir vaqtda bitta kassir; band kassaga boshqa kassir kira olmaydi; admin majburan bo'shatishi mumkin (jurnalga yoziladi) |
+| A-016 | Username: 3–50 belgi, lotin harf, raqam, `_` va `.`; katta-kichik harf farqsiz |
+| A-017 | Parol: 4–64 belgi, katta-kichik harf farqlanadi; berishda "Yangi parol" + "Takrorlang" — mos kelmasa saqlanmaydi |
+| A-018 | Blok vaqtidagi urinishlar hisoblanmaydi va blokni uzaytirmaydi; blok vaqtida to'g'ri parol ham rad etiladi. Xabarlar: "Hisob vaqtincha bloklandi, 10 daqiqadan keyin urinib ko'ring" / "Hisob bloklandi, administratorga murojaat qiling" |
+| A-019 | Blokni ochish: past rollarni — admin va superadmin; admin'ni — faqat superadmin; superadmin'ni — faqat server buyrug'i. Har blok va ochish jurnalga |
+| A-020 | "Rollar / Lavozimlar" bo'limi faqat ro'yxat (nom, xodimlar soni, sana), CRUD yo'q (E-007) |
+| A-021 | Sessiya muddati 24 soat tanlandi (12 emas): do'kon ~14 soat ishlaydi, 12 soatda kassir savdo o'rtasida chiqarib yuborilardi |
+| A-022 | Parollar ro'yxatida holat: faol / vaqtincha bloklangan (qachongacha) / doimiy bloklangan + "Blokni ochish" tugmasi |
+| A-023 | Bloklash gibrid: hisoblagichlar va 10 daqiqalik blok — Redis (TTL); doimiy blok — PostgreSQL (`locked_at`), Redis qayta ishga tushsa ham saqlanadi |
+| A-024 | Redis ishlamasa — FAIL-OPEN: himoya vaqtincha o'chadi, login ishlaydi, logga ogohlantirish. Sabab: kassa to'xtab qolmasligi kerak |
+| A-025 | Mavjud bo'lmagan username ham sanaladi va bloklanadi (blok xabaridan username mavjudligini bilib bo'lmasin) |
+| A-026 | Blokdan keyingi "sinov davri" 24 soat eslab qolinadi |
+| A-027 | Login nomini admin o'zi yozadi; tizim faqat qoidani (A-016) va unikallikni tekshiradi |
+| A-028 | Arxivdagi xodimga login yaratilmaydi — avval xodim arxivdan qaytariladi |
+| A-029 | O'chirilgan login qaytarilmaydi. Kerak bo'lsa xodimga yangi login yaratiladi — boshqa nom bilan (A-010) |
+| A-030 | Xodim (admin ham) o'z parolini o'zi almashtirmaydi: kassir/omborchi/buxgalternikini admin, adminnikini superadmin almashtiradi |
+| A-031 | "Parollar" ro'yxatida holat: faol / vaqtincha blok (qachongacha, Redis TTL) / doimiy blok / o'chirilgan. "Blokni ochish" ikkalasini ham ochadi va hisoblagichlarni tozalaydi |
+
+## Xodimlar
+
+| # | Qaror |
+|---|---|
+| E-001 | Xodim maydonlari — hammasi majburiy: ism, familiya, tug'ilgan sana (yosh hisoblanadi), jins, telefon, lavozim, oylik maosh, rasm |
+| E-002 | Lavozim xodim yaratilayotganda tanlanadi; "Lavozimlar" bo'limi uni o'zgartiradi |
+| E-003 | Telefon raqami unikal (bir xil ism-familiyali xodimlar telefon orqali farqlanadi) |
+| E-004 | Rasm: JPG/PNG, 5 MB gacha, server 512×512 ga kichraytiradi; diskda saqlanadi, bazada faqat yo'li |
+| E-005 | Arxiv: xodim ro'yxatdan "Arxiv" bo'limiga o'tadi, login ishlamaydi va barcha sessiyalar yopiladi; arxivdan qaytarilsa — o'sha login yana ishlaydi |
+| E-006 | Xodim ismi boshqa jadvallarga nusxalanmaydi — hamma joy `employee_id` orqali oladi |
+| E-007 | "Lavozimlar" = o'zgarmas ma'lumotnoma (1C "Должности" kabi), "Rollar" bo'limi bilan bitta. Lavozim xodim formasida select orqali tanlanadi; o'zgartirish — xodim kartochkasidagi tugma (tasdiqlash + jurnal + qayta kirish) |
+| E-008 | Xodim formasi 3 guruhda: Shaxsiy ma'lumotlar (ism, familiya, sana, jins, rasm), Aloqa (telefon), Ish (lavozim, maosh) |
+| E-009 | O'chirish: tarixi yo'q xodim butunlay o'chadi (qator, lavozim tarixi, rasm). Tarixi bor xodim anonimlashtiriladi: ism → "O'chirilgan xodim #id", telefon va rasm o'chadi, loginlar o'chiriladi, sessiyalar yopiladi; qator qoladi (sotuv/kassa unga bog'langan), hech qaysi ro'yxatda ko'rinmaydi, telefon bo'shaydi. Hozircha "tarix" = kamida bir marta login berilgan; har modul qo'shilganda kengayadi |
+| E-010 | Lavozim va maosh tarixi (`employee_positions`, 1C "Кадровое перемещение"): har o'zgarishda eski davr `valid_to = yangi sana − 1 kun` bilan yopiladi, yangisi ochiladi; ochiq davr bittadan ko'p bo'lmaydi (baza indeksi). O'sha kunning o'zida o'zgartirish — joriy davrni tuzatadi. Lavozim o'zgarsa xodim barcha qurilmalardan chiqariladi; faqat maosh o'zgarsa — yo'q |
+| E-011 | Telefon istalgan yozuvda qabul qilinadi ("90 002 12 21", "+998 (90) …"), bazada `+998XXXXXXXXX`, ekranda `+998 90 002 12 21` |
+| E-012 | Rasm ochiq URL orqali beriladi (`/media/employees/<tasodifiy>.jpg`); fayl nomi tasodifiy (uuid), ketma-ket terib topib bo'lmaydi. Rasm doim JPEG ga o'giriladi |
+| E-013 | Ro'yxat sanalari bo'yicha filtr Toshkent vaqtida hisoblanadi (UTC'da emas) |
+| E-014 | Xodim yoshi 5 dan 100 gacha (to'liq yillar bo'yicha, Toshkent sanasi bilan) |
 
 ## Kassa va savdo
 
@@ -77,13 +112,38 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | B-001 | Buxgalter har kassadan ekrandagi summalarga qarab pul qabul qiladi; kamomad kassirning oyligidan ushlanadi; ortiqcha pul yozilmaydi |
 | B-002 | Pul yo'li: kassa → buxgalter qabuli → seyf; har bosqich to'liq audit bilan |
 | B-003 | Seyf: naqd/karta/terminal; xarajatlar (ijara, svet, gaz, ehson, oylik) seyfdan |
+| B-004 | "Katta kassir" vazifasini buxgalter roli bajaradi: kassadagi pulni sanab qabul qiladi, pul avtomatik seyfga o'tadi (alohida rol qo'shilmaydi — R-001) |
 | P-001 | Oylik: ishlangan kunlar, kunlik soat, oylik, bonus, jarima — admin kiritadi |
+
+## Muammolar (admin bildirishnomalari)
+
+| # | Qaror |
+|---|---|
+| N-001 | Admin panel tepasida 🔔 — **ochiq muammolar** soni (o'qilmagan xabarlar emas). Bosilsa — "Muammolar" ro'yxati |
+| N-002 | Bir xil muammo takrorlanmaydi — bitta yozuvga guruhlanadi ("anvar bloklandi — 3 marta, oxirgisi 10:02") |
+| N-003 | Muammo sababi bartaraf etilganda O'ZI yopiladi (masalan blok ochilganda). Yopilganlar o'chirilmaydi — tarixda: kim, qachon hal qildi |
+| N-004 | Filtrlar: holat (ochiq — standart / hal qilingan / hammasi), tur, sana oralig'i, xodim; eng yangisi tepada; pagination. Har yozuvda tezkor amal tugmasi (masalan "Blokni ochish") |
+| N-005 | Muammo turlari har modulda qo'shib boriladi. Hozirgi ro'yxat: akkaunt bloklandi (auth); 10 000 so'mdan katta chegirma (kassa). Rejada: kamomad, yaroqlilik muddati, qoldiq tugashi, qaytarishlar ko'payishi |
+
+## Operatsion va nazorat talablari
+
+| # | Qaror | Bosqich |
+|---|---|---|
+| O-001 | **Majburiy:** bazaning avtomatik zaxira nusxasi — har kecha `pg_dump`, server tashqarisidagi joyga, oxirgi 30 kun saqlanadi; tiklash yo'riqnomasi sinab ko'rilgan bo'lishi shart | Deploy |
+| O-002 | **Majburiy:** production xatolarini kuzatish (Sentry) — xato bo'lsa darhol xabar | Deploy |
+| O-003 | **Majburiy:** kun yakuni hisoboti (Z-hisobot) — kassa yopilganda: savdolar, naqd/karta/terminal, qaytarishlar, chegirmalar | Kassa |
+| O-004 | **Majburiy:** chek raqamlari har kassada uzluksiz (#000001, #000002…), bo'shliqsiz | Kassa |
+| C-001 | Narx o'zgarishlari tarixi: har mahsulot bo'yicha kim, qachon, qaysi narxdan qaysi narxga | Katalog |
+
+Keyinroq ko'rib chiqiladi (hozir rejada emas): kassa ekranini PIN bilan qulflash, faol sessiyalar sahifasi,
+rasmiy hujjatlar (logo, STIR, QR, PDF), versiyalar va CHANGELOG, Excel eksport, Telegram bildirishnomalari,
+dashboard grafiklari.
 
 ## Kerak emas (ataylab chiqarilgan)
 
 Avtomobil/avtoraqam modullari, operator va programist rollari, fiskal chek, smena moduli,
 sodiqlik ballari, kredit limiti, ko'p tillilik, ulgurji narx, qarzni hisobdan chiqarish,
-qo'lda qoldiq tuzatish, zaxira nusxa UI, SMS/eslatmalar.
+qo'lda qoldiq tuzatish, zaxira nusxa UI (zaxira nusxaning o'zi majburiy — O-001), SMS.
 
 ---
 

@@ -5,10 +5,12 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,13 +19,20 @@ from app.core.database import engine, get_session
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import request_context_middleware
+from app.core.redis import close_redis
+from app.modules.accounts.router import router as accounts_router
+from app.modules.auth.router import router as auth_router
+from app.modules.employees.router import router as employees_router
+
+API_PREFIX = "/api/v1"
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
-    # Ilova to'xtaganda barcha baza ulanishlari toza yopiladi
+    # Ilova to'xtaganda barcha ulanishlar toza yopiladi
     await engine.dispose()
+    await close_redis()
 
 
 def create_app() -> FastAPI:
@@ -46,6 +55,17 @@ def create_app() -> FastAPI:
     )
     app.middleware("http")(request_context_middleware)
     register_exception_handlers(app)
+
+    api = APIRouter(prefix=API_PREFIX)
+    api.include_router(auth_router)
+    api.include_router(employees_router)
+    api.include_router(accounts_router)
+    app.include_router(api)
+
+    # Xodim rasmlari ochiq havola orqali (E-012). Fayl nomlari tasodifiy.
+    media_root = Path(settings.media_root)
+    media_root.mkdir(parents=True, exist_ok=True)
+    app.mount(settings.media_url, StaticFiles(directory=media_root), name="media")
 
     @app.get("/health", tags=["system"])
     async def health(session: AsyncSession = Depends(get_session)) -> JSONResponse:

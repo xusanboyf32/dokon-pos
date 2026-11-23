@@ -7,7 +7,7 @@ Kodda maxfiy qiymat bo'lmaydi.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import PostgresDsn
+from pydantic import Field, PostgresDsn, RedisDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,10 +25,27 @@ class Settings(BaseSettings):
 
     # postgresql+asyncpg://user:parol@host:5432/baza
     database_url: PostgresDsn
+    # Testlar uchun alohida baza. Testlar jadvallarni o'chirib-qayta quradi —
+    # shuning uchun ular hech qachon ishchi bazada ishlamasligi kerak.
+    test_database_url: PostgresDsn | None = None
     db_pool_size: int = 10
     db_max_overflow: int = 20
     # Osilib qolgan so'rov shuncha millisekunddan keyin to'xtatiladi
     db_statement_timeout_ms: int = 5000
+
+    # Redis: login hisoblagichlari (keyinroq Celery). Testlar alohida baza raqamida (/15).
+    redis_url: RedisDsn = RedisDsn("redis://localhost:6379/0")
+    test_redis_url: RedisDsn | None = None
+
+    # --- Auth (A-004, A-005) ---
+    # SecretStr: logga yoki xato xabariga tasodifan chiqib ketmaydi (******** ko'rinadi)
+    jwt_secret_key: SecretStr = Field(min_length=32)
+    access_token_minutes: int = 15
+    refresh_token_hours: int = 24
+
+    # Yuklangan fayllar (xodim rasmlari va h.k.). Git'ga tushmaydi (.gitignore: media/)
+    media_root: str = "media"
+    media_url: str = "/media"
 
     cors_origins: list[str] = ["http://localhost:5173"]
 

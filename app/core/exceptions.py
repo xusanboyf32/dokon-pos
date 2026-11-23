@@ -12,6 +12,7 @@ import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 log = structlog.get_logger()
 
@@ -82,7 +83,11 @@ async def _app_error_handler(request: Request, exc: Exception) -> JSONResponse:
 async def _validation_error_handler(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, RequestValidationError)
     fields = [
-        {"field": ".".join(str(p) for p in err["loc"][1:]), "message": err["msg"]}
+        {
+            "field": ".".join(str(p) for p in err["loc"][1:]),
+            # Pydantic o'z validatorlarimiz xabariga "Value error, " qo'shadi — olib tashlaymiz
+            "message": str(err["msg"]).removeprefix("Value error, "),
+        }
         for err in exc.errors()
     ]
     return JSONResponse(
@@ -90,6 +95,23 @@ async def _validation_error_handler(request: Request, exc: Exception) -> JSONRes
         content=_error_body(
             request, "VALIDATION_ERROR", "Ma'lumotlar noto'g'ri", {"fields": fields}
         ),
+    )
+
+
+_HTTP_ERRORS: dict[int, tuple[str, str]] = {
+    404: ("NOT_FOUND", "Bunday manzil topilmadi"),
+    405: ("METHOD_NOT_ALLOWED", "Bu manzil uchun bunday so'rov turi qo'llanmaydi"),
+}
+
+
+async def _http_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """FastAPI'ning o'z xatolari (masalan, mavjud bo'lmagan manzil) ham yagona formatda."""
+    assert isinstance(exc, StarletteHTTPException)
+    code, message = _HTTP_ERRORS.get(exc.status_code, ("HTTP_ERROR", str(exc.detail)))
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=_error_body(request, code, message, {}),
+        headers=getattr(exc, "headers", None),
     )
 
 
@@ -105,4 +127,5 @@ async def _unhandled_error_handler(request: Request, exc: Exception) -> JSONResp
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(AppError, _app_error_handler)
     app.add_exception_handler(RequestValidationError, _validation_error_handler)
+    app.add_exception_handler(StarletteHTTPException, _http_error_handler)
     app.add_exception_handler(Exception, _unhandled_error_handler)

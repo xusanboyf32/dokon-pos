@@ -27,3 +27,12 @@ frontend/dist/
 logs/
 .DS_Store
 Thumbs.db
+
+# --- Yuklangan fayllar (xodim rasmlari va h.k.) — serverda saqlanadi, git'da emas ---
+media/
+uploads/
+
+# --- Baza nusxalari: ichida shaxsiy ma'lumot bo'ladi ---
+*.sql
+*.dump
+*.backup
