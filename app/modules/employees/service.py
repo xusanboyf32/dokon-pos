@@ -28,6 +28,7 @@ from app.modules.employees.schemas import (
     PositionChange,
     PositionOut,
     RoleOut,
+    full_years,
 )
 
 
@@ -55,10 +56,6 @@ def today() -> date:
     return to_tashkent(utcnow()).date()
 
 
-def _age(birth: date, on: date) -> int:
-    return on.year - birth.year - ((on.month, on.day) < (birth.month, birth.day))
-
-
 def to_out(employee: Employee) -> EmployeeOut:
     role = Role(employee.role)
     return EmployeeOut(
@@ -67,7 +64,7 @@ def to_out(employee: Employee) -> EmployeeOut:
         last_name=employee.last_name,
         full_name=employee.full_name,
         birth_date=employee.birth_date,
-        age=_age(employee.birth_date, today()),
+        age=full_years(employee.birth_date, today()),
         gender=Gender(employee.gender),
         phone=format_phone(employee.phone) if employee.phone else None,
         role=role,

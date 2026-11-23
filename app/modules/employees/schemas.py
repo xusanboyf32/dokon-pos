@@ -29,9 +29,19 @@ def _phone(value: str) -> str:
         raise ValueError(exc.message) from exc
 
 
+MIN_AGE = 5
+MAX_AGE = 100
+
+
+def full_years(birth: date, on: date) -> int:
+    """To'liq yillar: tug'ilgan kun hali kelmagan bo'lsa — bir yil kam."""
+    return on.year - birth.year - ((on.month, on.day) < (birth.month, birth.day))
+
+
 def _birth_date(value: date) -> date:
-    if not date(1900, 1, 2) <= value < to_tashkent(utcnow()).date():
-        raise ValueError("Tug'ilgan sana noto'g'ri")
+    age = full_years(value, to_tashkent(utcnow()).date())
+    if not MIN_AGE <= age <= MAX_AGE:
+        raise ValueError(f"Xodimning yoshi {MIN_AGE} dan {MAX_AGE} gacha bo'lishi kerak")
     return value
 
 

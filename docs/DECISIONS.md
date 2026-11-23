@@ -86,6 +86,7 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | E-011 | Telefon istalgan yozuvda qabul qilinadi ("90 002 12 21", "+998 (90) …"), bazada `+998XXXXXXXXX`, ekranda `+998 90 002 12 21` |
 | E-012 | Rasm ochiq URL orqali beriladi (`/media/employees/<tasodifiy>.jpg`); fayl nomi tasodifiy (uuid), ketma-ket terib topib bo'lmaydi. Rasm doim JPEG ga o'giriladi |
 | E-013 | Ro'yxat sanalari bo'yicha filtr Toshkent vaqtida hisoblanadi (UTC'da emas) |
+| E-014 | Xodim yoshi 5 dan 100 gacha (to'liq yillar bo'yicha, Toshkent sanasi bilan) |
 
 ## Kassa va savdo
 

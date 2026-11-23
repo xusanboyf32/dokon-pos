@@ -83,7 +83,11 @@ async def _app_error_handler(request: Request, exc: Exception) -> JSONResponse:
 async def _validation_error_handler(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, RequestValidationError)
     fields = [
-        {"field": ".".join(str(p) for p in err["loc"][1:]), "message": err["msg"]}
+        {
+            "field": ".".join(str(p) for p in err["loc"][1:]),
+            # Pydantic o'z validatorlarimiz xabariga "Value error, " qo'shadi — olib tashlaymiz
+            "message": str(err["msg"]).removeprefix("Value error, "),
+        }
         for err in exc.errors()
     ]
     return JSONResponse(

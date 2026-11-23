@@ -93,7 +93,9 @@ async def test_bad_phone_is_validation_error(api: AsyncClient, db_session: Async
     )
 
     assert response.status_code == 422
-    assert "phone" in response.text
+    [field] = response.json()["error"]["details"]["fields"]
+    assert field["field"] == "phone"
+    assert field["message"].startswith("Telefon raqami noto'g'ri")  # "Value error, " siz
 
 
 async def test_not_an_image_is_rejected(api: AsyncClient, db_session: AsyncSession) -> None:
