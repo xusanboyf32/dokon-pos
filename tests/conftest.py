@@ -7,6 +7,7 @@
 """
 
 import os
+import tempfile
 
 from app.core.config import Settings
 
@@ -19,6 +20,8 @@ if _settings.test_database_url is not None:
 os.environ["ENVIRONMENT"] = "test"
 # Redis: testlar alohida baza raqamida (15) — ishchi ma'lumotlarga tegmaydi
 os.environ["REDIS_URL"] = str(_settings.test_redis_url or "redis://localhost:6379/15")
+# Test rasmlari loyiha papkasiga emas, vaqtinchalik papkaga tushadi
+os.environ["MEDIA_ROOT"] = tempfile.mkdtemp(prefix="dokon-test-media-")
 
 # Xavfsizlik qulfi: testlar jadvallarni o'chirib-qayta quradi.
 # Bazaning nomi "_test" bilan tugamasa — testlar umuman ishga tushmaydi.
@@ -40,7 +43,8 @@ from redis.asyncio import Redis  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
 from alembic import command  # noqa: E402
-from app.core.database import engine  # noqa: E402
+from app.core.database import engine, get_session  # noqa: E402
+from app.core.redis import get_redis  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.modules.auth.lockout import LoginGuard  # noqa: E402
 from app.modules.auth.service import AuthService  # noqa: E402
@@ -119,3 +123,20 @@ def guard(redis_client: Redis) -> LoginGuard:
 @pytest.fixture
 def service(db_session: AsyncSession, guard: LoginGuard) -> AuthService:
     return AuthService(db_session, guard)
+
+
+# ------------------------------------------------------------------ API
+@pytest.fixture
+async def api(
+    app: FastAPI, db_session: AsyncSession, redis_client: Redis
+) -> AsyncIterator[AsyncClient]:
+    """Ilova testning tranzaksiyali sessiyasidan foydalanadi — test oxirida hammasi ROLLBACK."""
+
+    async def _test_session() -> AsyncIterator[AsyncSession]:
+        yield db_session
+
+    app.dependency_overrides[get_session] = _test_session
+    app.dependency_overrides[get_redis] = lambda: redis_client
+    transport = ASGITransport(app=app, raise_app_exceptions=False)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client

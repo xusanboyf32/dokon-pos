@@ -43,6 +43,10 @@ class Settings(BaseSettings):
     access_token_minutes: int = 15
     refresh_token_hours: int = 24
 
+    # Yuklangan fayllar (xodim rasmlari va h.k.). Git'ga tushmaydi (.gitignore: media/)
+    media_root: str = "media"
+    media_url: str = "/media"
+
     cors_origins: list[str] = ["http://localhost:5173"]
 
     @property

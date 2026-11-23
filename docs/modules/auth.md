@@ -6,9 +6,9 @@ Bog'liq qarorlar: DECISIONS.md → R-001…R-006, A-001…A-015.
 
 | Bo'lim | Vazifasi | Backend resursi |
 |---|---|---|
-| Rollar | 6 ta rol ro'yxati (faqat ko'rish) | `GET /roles` |
+| Rollar / Lavozimlar | Ma'lumotnoma: rollar ro'yxati va har birida nechta xodim (faqat ko'rish, E-007) | `GET /roles` |
 | Xodimlar | Xodim qo'shish/tahrirlash: ism, familiya, tug'ilgan sana, jins, telefon, lavozim, maosh, rasm | `employees` |
-| Lavozimlar | Xodimga rol berish | `PUT /employees/{id}/role` |
+| Xodim kartochkasi → "Lavozimni o'zgartirish" | Tasdiqlash oynasi, jurnal, xodim qayta kiradi | `PUT /employees/{id}/role` |
 | Parollar | Xodimga (yoki ta'minotchiga) username va parol berish, parolni almashtirish, blokni ochish | `accounts` |
 | Mening sahifam | Har bir foydalanuvchi o'z profilini ko'radi (faqat ko'rish) | `GET /auth/me` |
 

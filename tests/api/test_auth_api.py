@@ -1,15 +1,9 @@
 """Auth endpoint'lari HTTP darajasida: status kodlar, cookie, xato formati."""
 
-from collections.abc import AsyncIterator
-
 import pytest
-from fastapi import FastAPI
-from httpx import ASGITransport, AsyncClient
-from redis.asyncio import Redis
+from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.database import get_session
-from app.core.redis import get_redis
 from app.core.roles import Role
 from tests.integration.test_auth_service import PASSWORD, create_user
 
@@ -17,22 +11,6 @@ LOGIN = "/api/v1/auth/login"
 REFRESH = "/api/v1/auth/refresh"
 LOGOUT = "/api/v1/auth/logout"
 ME = "/api/v1/auth/me"
-
-
-@pytest.fixture
-async def api(
-    app: FastAPI, db_session: AsyncSession, redis_client: Redis
-) -> AsyncIterator[AsyncClient]:
-    """Ilova testning tranzaksiyali sessiyasidan foydalanadi — test oxirida hammasi ROLLBACK."""
-
-    async def _test_session() -> AsyncIterator[AsyncSession]:
-        yield db_session
-
-    app.dependency_overrides[get_session] = _test_session
-    app.dependency_overrides[get_redis] = lambda: redis_client
-    transport = ASGITransport(app=app, raise_app_exceptions=False)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        yield client
 
 
 async def _login(api: AsyncClient, username: str = "anvar") -> str:
