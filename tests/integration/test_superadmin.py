@@ -13,16 +13,17 @@ from app.modules.accounts.validation import (
     InvalidUsernameError,
     PasswordMismatchError,
 )
+from app.modules.auth.lockout import LoginGuard
 from app.modules.auth.service import AuthService
 
 
-async def test_create_superadmin_and_login(db_session: AsyncSession) -> None:
+async def test_create_superadmin_and_login(db_session: AsyncSession, service: AuthService) -> None:
     account = await create_superadmin(db_session, "  Xusanboy ", "Kuchli2026", "Kuchli2026")
 
     assert account.username == "xusanboy"  # kichik harf, bo'sh joysiz
     assert account.is_superadmin
     assert verify_password("Kuchli2026", account.password_hash)
-    pair = await AuthService(db_session).login("xusanboy", "Kuchli2026", ip=None, user_agent=None)
+    pair = await service.login("xusanboy", "Kuchli2026", ip=None, user_agent=None)
     assert pair.role is Role.SUPERADMIN
 
 
@@ -51,15 +52,15 @@ async def test_password_confirmation_must_match(db_session: AsyncSession) -> Non
         await create_superadmin(db_session, "xusanboy", "1234", "1235")
 
 
-async def test_unlock_superadmin(db_session: AsyncSession) -> None:
+async def test_unlock_superadmin(db_session: AsyncSession, guard: LoginGuard) -> None:
     account = await create_superadmin(db_session, "xusanboy", "1234", "1234")
     account.locked_at = utcnow()
 
-    unlocked = await unlock_superadmin(db_session)
+    unlocked = await unlock_superadmin(db_session, guard)
 
     assert unlocked.locked_at is None
 
 
-async def test_unlock_without_superadmin_fails(db_session: AsyncSession) -> None:
+async def test_unlock_without_superadmin_fails(db_session: AsyncSession, guard: LoginGuard) -> None:
     with pytest.raises(NotFoundError):
-        await unlock_superadmin(db_session)
+        await unlock_superadmin(db_session, guard)

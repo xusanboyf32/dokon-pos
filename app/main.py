@@ -17,6 +17,7 @@ from app.core.database import engine, get_session
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import request_context_middleware
+from app.core.redis import close_redis
 from app.modules.auth.router import router as auth_router
 
 API_PREFIX = "/api/v1"
@@ -25,8 +26,9 @@ API_PREFIX = "/api/v1"
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
-    # Ilova to'xtaganda barcha baza ulanishlari toza yopiladi
+    # Ilova to'xtaganda barcha ulanishlar toza yopiladi
     await engine.dispose()
+    await close_redis()
 
 
 def create_app() -> FastAPI:

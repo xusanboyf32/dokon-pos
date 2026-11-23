@@ -7,7 +7,7 @@ Kodda maxfiy qiymat bo'lmaydi.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, PostgresDsn, SecretStr
+from pydantic import Field, PostgresDsn, RedisDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,6 +32,10 @@ class Settings(BaseSettings):
     db_max_overflow: int = 20
     # Osilib qolgan so'rov shuncha millisekunddan keyin to'xtatiladi
     db_statement_timeout_ms: int = 5000
+
+    # Redis: login hisoblagichlari (keyinroq Celery). Testlar alohida baza raqamida (/15).
+    redis_url: RedisDsn = RedisDsn("redis://localhost:6379/0")
+    test_redis_url: RedisDsn | None = None
 
     # --- Auth (A-004, A-005) ---
     # SecretStr: logga yoki xato xabariga tasodifan chiqib ketmaydi (******** ko'rinadi)

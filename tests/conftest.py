@@ -17,6 +17,8 @@ _settings = Settings()
 if _settings.test_database_url is not None:
     os.environ["DATABASE_URL"] = str(_settings.test_database_url)
 os.environ["ENVIRONMENT"] = "test"
+# Redis: testlar alohida baza raqamida (15) — ishchi ma'lumotlarga tegmaydi
+os.environ["REDIS_URL"] = str(_settings.test_redis_url or "redis://localhost:6379/15")
 
 # Xavfsizlik qulfi: testlar jadvallarni o'chirib-qayta quradi.
 # Bazaning nomi "_test" bilan tugamasa — testlar umuman ishga tushmaydi.
@@ -34,11 +36,14 @@ import pytest  # noqa: E402
 from alembic.config import Config as AlembicConfig  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
+from redis.asyncio import Redis  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
 from alembic import command  # noqa: E402
 from app.core.database import engine  # noqa: E402
 from app.main import create_app  # noqa: E402
+from app.modules.auth.lockout import LoginGuard  # noqa: E402
+from app.modules.auth.service import AuthService  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -91,3 +96,26 @@ async def db_session(migrated_database: None) -> AsyncIterator[AsyncSession]:
         finally:
             await session.close()
             await transaction.rollback()
+
+
+# ------------------------------------------------------------------ redis
+@pytest.fixture
+async def redis_client() -> AsyncIterator[Redis]:
+    """Har test toza Redis bazasi bilan boshlanadi va tugaydi."""
+    client = Redis.from_url(os.environ["REDIS_URL"], decode_responses=True)
+    await client.flushdb()
+    try:
+        yield client
+    finally:
+        await client.flushdb()
+        await client.aclose()
+
+
+@pytest.fixture
+def guard(redis_client: Redis) -> LoginGuard:
+    return LoginGuard(redis_client)
+
+
+@pytest.fixture
+def service(db_session: AsyncSession, guard: LoginGuard) -> AuthService:
+    return AuthService(db_session, guard)

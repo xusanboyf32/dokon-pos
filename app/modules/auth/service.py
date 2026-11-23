@@ -1,13 +1,15 @@
 """Auth biznes-mantig'i: login, refresh, logout, joriy foydalanuvchi.
 
 Oqimlar docs/modules/auth.md, 4-bo'limda. Har bir ochiq metod — bitta tranzaksiya.
-Bloklash (Redis) keyingi qadamda shu yerga qo'shiladi.
+Kirishga urinishdan himoya — LoginGuard (lockout.py).
 """
 
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from typing import NoReturn
 
+import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
@@ -26,12 +28,16 @@ from app.modules.accounts.models import UserAccount
 from app.modules.auth import repository as repo
 from app.modules.auth.exceptions import (
     AccountLockedError,
+    AccountTemporarilyLockedError,
     InvalidCredentialsError,
     RefreshTokenReusedError,
     SessionExpiredError,
     SessionInvalidError,
 )
+from app.modules.auth.lockout import LockDecision, LoginGuard
 from app.modules.auth.models import AuthSession, RevokeReason
+
+log = structlog.get_logger()
 
 # Bir vaqtda faqat bitta joyda ishlay oladigan rollar (A-014)
 SINGLE_SESSION_ROLES = frozenset({Role.KASSIR})
@@ -72,25 +78,48 @@ def _can_sign_in(account: UserAccount) -> bool:
 
 
 class AuthService:
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(self, session: AsyncSession, guard: LoginGuard) -> None:
         self._session = session
+        self._guard = guard
 
     # ------------------------------------------------------------------ login
     async def login(
         self, username: str, password: str, *, ip: str | None, user_agent: str | None
     ) -> TokenPair:
-        account = await repo.get_account_by_username(self._session, username.strip().lower())
+        username = username.strip().lower()
+        account = await repo.get_account_by_username(self._session, username)
 
-        if account is None or not _can_sign_in(account):
+        # 1. Doimiy blok — to'g'ri parol ham qabul qilinmaydi (7a, 7d)
+        if account is not None and account.locked_at is not None:
             verify_password_against_dummy(password)  # javob vaqti bir xil bo'lsin
-            raise InvalidCredentialsError()
-        if account.locked_at is not None:
-            # Blok vaqtida to'g'ri parol ham qabul qilinmaydi (7a-band)
-            verify_password_against_dummy(password)
             raise AccountLockedError()
-        if not verify_password(password, account.password_hash):
-            raise InvalidCredentialsError()
 
+        # 2. Vaqtincha blok va tezlik chegarasi (Redis).
+        #    Mavjud bo'lmagan username ham sanaladi — aks holda blok xabaridan
+        #    qaysi username mavjudligini bilib olish mumkin bo'lardi.
+        attempt = await self._guard.on_attempt(username)
+        if attempt.locked_seconds_left is not None:
+            verify_password_against_dummy(password)
+            raise AccountTemporarilyLockedError(attempt.locked_seconds_left)
+        if attempt.decision is not LockDecision.NONE:
+            verify_password_against_dummy(password)
+            await self._apply_lock(attempt.decision, account, username, ip)
+
+        # 3. Parol
+        if account is None or not _can_sign_in(account):
+            verify_password_against_dummy(password)
+            valid = False
+        else:
+            valid = verify_password(password, account.password_hash)
+        if not valid:
+            decision = await self._guard.on_failure(username)
+            if decision is not LockDecision.NONE:
+                await self._apply_lock(decision, account, username, ip)
+            raise InvalidCredentialsError()
+        assert account is not None
+
+        # 4. Muvaffaqiyat — hisoblagichlar 0 (7c)
+        await self._guard.on_success(username)
         now = utcnow()
         role = resolve_role(account)
         if role in SINGLE_SESSION_ROLES:
@@ -113,6 +142,29 @@ class AuthService:
         await self._session.commit()
 
         return self._token_pair(account, auth_session, refresh_token, role)
+
+    async def _apply_lock(
+        self,
+        decision: LockDecision,
+        account: UserAccount | None,
+        username: str,
+        ip: str | None,
+    ) -> NoReturn:
+        """Blok qarorini bajaradi va mos xatoni ko'taradi.
+
+        Faol sessiyalar TO'XTATILMAYDI — blok faqat yangi kirishga tegadi (7g).
+        """
+        if decision is LockDecision.PERMANENT and account is not None:
+            account.locked_at = utcnow()
+            await self._session.commit()
+            # TODO(audit): 3-bosqichda audit jurnaliga ham yoziladi (7f)
+            log.warning("account_locked_permanently", username=username, ip=ip)
+            raise AccountLockedError()
+
+        if decision is LockDecision.PERMANENT:  # bunday username yo'q — yana vaqtincha
+            await self._guard.lock_temporarily(username)
+        log.warning("account_locked_temporarily", username=username, ip=ip)
+        raise AccountTemporarilyLockedError(self._guard.lock_seconds)
 
     # ------------------------------------------------------------------ refresh
     async def refresh(
@@ -140,7 +192,7 @@ class AuthService:
             raise SessionExpiredError()
 
         account = await repo.get_account_by_id(self._session, old.account_id)
-        if account is None or not _can_sign_in(account) or account.locked_at is not None:
+        if account is None or not _can_sign_in(account):
             await repo.revoke_active_sessions_of_family(
                 self._session, old.family_id, RevokeReason.ACCOUNT_DISABLED, now
             )
@@ -182,10 +234,10 @@ class AuthService:
         claims = decode_access_token(access_token)
 
         account = await repo.get_account_by_id(self._session, claims.account_id)
+        # locked_at bu yerda tekshirilmaydi: blok faqat yangi kirishga tegadi (7g)
         if (
             account is None
             or not _can_sign_in(account)
-            or account.locked_at is not None
             or account.token_version != claims.token_version
         ):
             raise SessionInvalidError()
