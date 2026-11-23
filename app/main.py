@@ -20,6 +20,7 @@ from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import request_context_middleware
 from app.core.redis import close_redis
+from app.modules.accounts.router import router as accounts_router
 from app.modules.auth.router import router as auth_router
 from app.modules.employees.router import router as employees_router
 
@@ -58,6 +59,7 @@ def create_app() -> FastAPI:
     api = APIRouter(prefix=API_PREFIX)
     api.include_router(auth_router)
     api.include_router(employees_router)
+    api.include_router(accounts_router)
     app.include_router(api)
 
     # Xodim rasmlari ochiq havola orqali (E-012). Fayl nomlari tasodifiy.

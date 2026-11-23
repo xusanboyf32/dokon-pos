@@ -7,15 +7,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.pagination import PageParams
 from app.core.roles import Role
+from app.core.sql import escape_like
 from app.core.time import TASHKENT_TZ
 from app.modules.accounts.models import UserAccount
 from app.modules.employees.models import Employee, EmployeePosition
 from app.modules.employees.schemas import EmployeeStatus
-
-
-def _escape_like(text: str) -> str:
-    # % va _ — LIKE'ning maxsus belgilari; foydalanuvchi yozsa oddiy belgi bo'lsin
-    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
 
 
 def _visible() -> Select[Employee]:
@@ -49,7 +45,7 @@ async def search(
     else:
         stmt = stmt.where(Employee.archived_at.is_not(None))
     if text_query:
-        pattern = f"%{_escape_like(text_query.strip())}%"
+        pattern = f"%{escape_like(text_query.strip())}%"
         full_name = Employee.first_name + " " + Employee.last_name
         stmt = stmt.where(
             or_(

@@ -14,6 +14,7 @@ Redis ishlamasa → FAIL-OPEN: himoya vaqtincha o'chadi, do'kon ishlashda davom 
 logga ogohlantirish yoziladi. Doimiy bloklar bazada bo'lgani uchun baribir ishlaydi.
 """
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
@@ -123,6 +124,24 @@ class LoginGuard:
                 await pipe.execute()
         except RedisError:
             log.warning("login_guard_unavailable", step="lock_temporarily")
+
+    async def locked_seconds_left(self, usernames: Sequence[str]) -> dict[str, int]:
+        """ "Parollar" ro'yxati uchun: qaysi username vaqtincha blokda va yana necha soniya.
+
+        Bitta pipeline — 20 ta akkaunt uchun 20 ta emas, bitta Redis so'rovi.
+        Redis ishlamasa — bo'sh javob (ro'yxat baribir ochiladi).
+        """
+        if not usernames:
+            return {}
+        try:
+            async with self._redis.pipeline(transaction=False) as pipe:
+                for username in usernames:
+                    pipe.ttl(self._key("lock", username))
+                ttls = await pipe.execute()
+        except RedisError:
+            log.warning("login_guard_unavailable", step="locked_seconds_left")
+            return {}
+        return {name: ttl for name, ttl in zip(usernames, ttls, strict=True) if ttl > 0}
 
     @property
     def lock_seconds(self) -> int:

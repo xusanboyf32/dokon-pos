@@ -63,6 +63,11 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | A-024 | Redis ishlamasa — FAIL-OPEN: himoya vaqtincha o'chadi, login ishlaydi, logga ogohlantirish. Sabab: kassa to'xtab qolmasligi kerak |
 | A-025 | Mavjud bo'lmagan username ham sanaladi va bloklanadi (blok xabaridan username mavjudligini bilib bo'lmasin) |
 | A-026 | Blokdan keyingi "sinov davri" 24 soat eslab qolinadi |
+| A-027 | Login nomini admin o'zi yozadi; tizim faqat qoidani (A-016) va unikallikni tekshiradi |
+| A-028 | Arxivdagi xodimga login yaratilmaydi — avval xodim arxivdan qaytariladi |
+| A-029 | O'chirilgan login qaytarilmaydi. Kerak bo'lsa xodimga yangi login yaratiladi — boshqa nom bilan (A-010) |
+| A-030 | Xodim (admin ham) o'z parolini o'zi almashtirmaydi: kassir/omborchi/buxgalternikini admin, adminnikini superadmin almashtiradi |
+| A-031 | "Parollar" ro'yxatida holat: faol / vaqtincha blok (qachongacha, Redis TTL) / doimiy blok / o'chirilgan. "Blokni ochish" ikkalasini ham ochadi va hisoblagichlarni tozalaydi |
 
 ## Xodimlar
 
@@ -72,10 +77,15 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | E-002 | Lavozim xodim yaratilayotganda tanlanadi; "Lavozimlar" bo'limi uni o'zgartiradi |
 | E-003 | Telefon raqami unikal (bir xil ism-familiyali xodimlar telefon orqali farqlanadi) |
 | E-004 | Rasm: JPG/PNG, 5 MB gacha, server 512×512 ga kichraytiradi; diskda saqlanadi, bazada faqat yo'li |
-| E-005 | Tarixi bor xodim o'chirilmaydi — arxivlanadi: login o'chadi, tarix qoladi |
+| E-005 | Arxiv: xodim ro'yxatdan "Arxiv" bo'limiga o'tadi, login ishlamaydi va barcha sessiyalar yopiladi; arxivdan qaytarilsa — o'sha login yana ishlaydi |
 | E-006 | Xodim ismi boshqa jadvallarga nusxalanmaydi — hamma joy `employee_id` orqali oladi |
 | E-007 | "Lavozimlar" = o'zgarmas ma'lumotnoma (1C "Должности" kabi), "Rollar" bo'limi bilan bitta. Lavozim xodim formasida select orqali tanlanadi; o'zgartirish — xodim kartochkasidagi tugma (tasdiqlash + jurnal + qayta kirish) |
 | E-008 | Xodim formasi 3 guruhda: Shaxsiy ma'lumotlar (ism, familiya, sana, jins, rasm), Aloqa (telefon), Ish (lavozim, maosh) |
+| E-009 | O'chirish: tarixi yo'q xodim butunlay o'chadi (qator, lavozim tarixi, rasm). Tarixi bor xodim anonimlashtiriladi: ism → "O'chirilgan xodim #id", telefon va rasm o'chadi, loginlar o'chiriladi, sessiyalar yopiladi; qator qoladi (sotuv/kassa unga bog'langan), hech qaysi ro'yxatda ko'rinmaydi, telefon bo'shaydi. Hozircha "tarix" = kamida bir marta login berilgan; har modul qo'shilganda kengayadi |
+| E-010 | Lavozim va maosh tarixi (`employee_positions`, 1C "Кадровое перемещение"): har o'zgarishda eski davr `valid_to = yangi sana − 1 kun` bilan yopiladi, yangisi ochiladi; ochiq davr bittadan ko'p bo'lmaydi (baza indeksi). O'sha kunning o'zida o'zgartirish — joriy davrni tuzatadi. Lavozim o'zgarsa xodim barcha qurilmalardan chiqariladi; faqat maosh o'zgarsa — yo'q |
+| E-011 | Telefon istalgan yozuvda qabul qilinadi ("90 002 12 21", "+998 (90) …"), bazada `+998XXXXXXXXX`, ekranda `+998 90 002 12 21` |
+| E-012 | Rasm ochiq URL orqali beriladi (`/media/employees/<tasodifiy>.jpg`); fayl nomi tasodifiy (uuid), ketma-ket terib topib bo'lmaydi. Rasm doim JPEG ga o'giriladi |
+| E-013 | Ro'yxat sanalari bo'yicha filtr Toshkent vaqtida hisoblanadi (UTC'da emas) |
 
 ## Kassa va savdo
 
