@@ -44,14 +44,32 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | A-005 | Refresh token 24 soat, **logindan boshlab mutlaq** (rotation muddatni uzaytirmaydi), httpOnly cookie |
 | A-006 | Refresh token rotation; eski token qayta ishlatilsa — akkauntning barcha sessiyalari yopiladi |
 | A-007 | Parol yoki lavozim o'zgarsa `token_version` oshadi → barcha qurilmalardan chiqariladi. Tarix (savdo, oylik) saqlanadi |
-| A-008 | Parol hech qachon ko'rsatilmaydi; admin faqat yangi parol qo'yadi |
-| A-009 | Parol kamida 4 belgi |
+| A-008 | Parol hech qachon ko'rsatilmaydi; admin faqat yangi parol qo'yadi (dastlabki promptdagi "ko'z tugmasi" talabi xavfsizlik sababli bekor qilindi) |
+| A-009 | Parol kamida 4 belgi (batafsil: A-017) |
 | A-010 | Username kichik harfda, unikal, **qayta ishlatilmaydi** (ketgan xodimning username'i yangi xodimga berilmaydi) |
 | A-011 | Lockout: 5 ketma-ket xato yoki 1 daqiqada 5+ urinish → 10 daqiqa blok. Shundan keyin 3 xato → doimiy blok (admin ochadi; superadmin'ni faqat server buyrug'i ochadi). Faol sessiyalar uzilmaydi |
 | A-012 | Profil faqat ko'rish uchun; barcha ma'lumotlarni (telefon ham) admin kiritadi |
 | A-013 | Superadmin kodda emas — CLI buyrug'i bilan yaratiladi |
 | A-014 | Bir kassir bir vaqtda bitta joyda: yangi login eski sessiyani yopadi |
 | A-015 | Bir kassada bir vaqtda bitta kassir; band kassaga boshqa kassir kira olmaydi; admin majburan bo'shatishi mumkin (jurnalga yoziladi) |
+| A-016 | Username: 3–50 belgi, lotin harf, raqam, `_` va `.`; katta-kichik harf farqsiz |
+| A-017 | Parol: 4–64 belgi, katta-kichik harf farqlanadi; berishda "Yangi parol" + "Takrorlang" — mos kelmasa saqlanmaydi |
+| A-018 | Blok vaqtidagi urinishlar hisoblanmaydi va blokni uzaytirmaydi; blok vaqtida to'g'ri parol ham rad etiladi. Xabarlar: "Hisob vaqtincha bloklandi, 10 daqiqadan keyin urinib ko'ring" / "Hisob bloklandi, administratorga murojaat qiling" |
+| A-019 | Blokni ochish: past rollarni — admin va superadmin; admin'ni — faqat superadmin; superadmin'ni — faqat server buyrug'i. Har blok va ochish jurnalga |
+| A-020 | "Rollar" bo'limi faqat ro'yxat (nom, sana, vaqt), CRUD yo'q |
+| A-021 | Sessiya muddati 24 soat tanlandi (12 emas): do'kon ~14 soat ishlaydi, 12 soatda kassir savdo o'rtasida chiqarib yuborilardi |
+| A-022 | Parollar ro'yxatida holat: faol / vaqtincha bloklangan (qachongacha) / doimiy bloklangan + "Blokni ochish" tugmasi |
+
+## Xodimlar
+
+| # | Qaror |
+|---|---|
+| E-001 | Xodim maydonlari — hammasi majburiy: ism, familiya, tug'ilgan sana (yosh hisoblanadi), jins, telefon, lavozim, oylik maosh, rasm |
+| E-002 | Lavozim xodim yaratilayotganda tanlanadi; "Lavozimlar" bo'limi uni o'zgartiradi |
+| E-003 | Telefon raqami unikal (bir xil ism-familiyali xodimlar telefon orqali farqlanadi) |
+| E-004 | Rasm: JPG/PNG, 5 MB gacha, server 512×512 ga kichraytiradi; diskda saqlanadi, bazada faqat yo'li |
+| E-005 | Tarixi bor xodim o'chirilmaydi — arxivlanadi: login o'chadi, tarix qoladi |
+| E-006 | Xodim ismi boshqa jadvallarga nusxalanmaydi — hamma joy `employee_id` orqali oladi |
 
 ## Kassa va savdo
 

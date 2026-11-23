@@ -6,7 +6,8 @@ Bog'liq qarorlar: DECISIONS.md → R-001…R-006, A-001…A-015.
 
 | Bo'lim | Vazifasi | Backend resursi |
 |---|---|---|
-| Xodimlar | Xodim qo'shish/tahrirlash: ism, familiya, tug'ilgan sana, jins, telefon | `employees` |
+| Rollar | 6 ta rol ro'yxati (faqat ko'rish) | `GET /roles` |
+| Xodimlar | Xodim qo'shish/tahrirlash: ism, familiya, tug'ilgan sana, jins, telefon, lavozim, maosh, rasm | `employees` |
 | Lavozimlar | Xodimga rol berish | `PUT /employees/{id}/role` |
 | Parollar | Xodimga (yoki ta'minotchiga) username va parol berish, parolni almashtirish, blokni ochish | `accounts` |
 | Mening sahifam | Har bir foydalanuvchi o'z profilini ko'radi (faqat ko'rish) | `GET /auth/me` |
@@ -14,16 +15,20 @@ Bog'liq qarorlar: DECISIONS.md → R-001…R-006, A-001…A-015.
 ## 2. Jadvallar
 
 ### employees
+Hamma maydon majburiy (E-001).
+
 | Ustun | Tur | Izoh |
 |---|---|---|
 | id | bigint identity | |
 | first_name, last_name | varchar(100) | |
-| birth_date | date, null | |
+| birth_date | date | yosh shundan hisoblanadi |
 | gender | varchar + CHECK (male/female) | |
-| phone | varchar(20), null | |
-| role | varchar + CHECK (6 ta rol) , null | null = hali lavozim berilmagan |
-| created_at, updated_at, deleted_at | timestamptz | |
-| created_by_id, updated_by_id | bigint → user_accounts | |
+| phone | varchar(13), unique | `+998XXXXXXXXX` formatida saqlanadi |
+| role | varchar + CHECK | superadmin, admin, kassir, omborchi, buxgalter (ta'minotchi xodim emas) |
+| salary | numeric(14,2) + CHECK ≥ 0 | oylik maosh |
+| photo_path | varchar(255) | diskdagi fayl yo'li |
+| archived_at | timestamptz, null | arxivlangan bo'lsa (E-005) |
+| created_at, updated_at | timestamptz | |
 
 ### user_accounts
 | Ustun | Tur | Izoh |

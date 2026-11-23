@@ -25,6 +25,9 @@ class Settings(BaseSettings):
 
     # postgresql+asyncpg://user:parol@host:5432/baza
     database_url: PostgresDsn
+    # Testlar uchun alohida baza. Testlar jadvallarni o'chirib-qayta quradi —
+    # shuning uchun ular hech qachon ishchi bazada ishlamasligi kerak.
+    test_database_url: PostgresDsn | None = None
     db_pool_size: int = 10
     db_max_overflow: int = 20
     # Osilib qolgan so'rov shuncha millisekunddan keyin to'xtatiladi
