@@ -1,0 +1,70 @@
+[project]
+name = "dokon-pos"
+version = "0.1.0"
+description = "Kichik va o'rta do'konlar uchun POS tizimi"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "alembic>=1.20.1",
+    "asyncpg>=0.32.0",
+    "fastapi>=0.165.0",
+    "pydantic-settings>=2.16.3",
+    "sqlalchemy[asyncio]>=2.1.9",
+    "structlog>=26.1.0",
+    "tzdata>=2026.6",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "httpx>=0.28.1",
+    "mypy>=2.4.1",
+    "pytest>=9.2.0",
+    "pytest-asyncio>=1.5.0",
+    "pytest-cov>=7.1.0",
+    "ruff>=0.17.6",
+]
+
+# ---------------------------------------------------------------- ruff
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = ["alembic/versions"]
+
+[tool.ruff.lint]
+select = [
+    "E", "W",   # pycodestyle: uslub xatolari
+    "F",        # pyflakes: ishlatilmagan import, aniqlanmagan nom
+    "I",        # import'lar tartibi
+    "B",        # bugbear: keng tarqalgan mantiqiy xatolar
+    "UP",       # eski sintaksisni zamonaviysiga almashtirish
+    "SIM",      # soddalashtirish mumkin bo'lgan joylar
+    "ASYNC",    # async kodda bloklovchi chaqiruvlar
+    "N",        # nomlash qoidalari
+    "DTZ",      # timezone'siz datetime taqiqlanadi
+]
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI'da Depends(...) argument default'ida ishlatiladi — bu xato emas
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Security"]
+
+# ---------------------------------------------------------------- mypy
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+exclude = ["alembic/"]
+
+# ---------------------------------------------------------------- pytest
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+addopts = "-ra --strict-markers"
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+# SQLAlchemy async ichida greenlet ishlatadi — shusiz coverage
+# `await session.execute(...)` dan keyingi qatorlarni "bajarilmagan" deb ko'rsatadi
+concurrency = ["greenlet", "thread"]

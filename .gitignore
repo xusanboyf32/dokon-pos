@@ -1,0 +1,29 @@
+# --- Maxfiy: hech qachon GitHub'ga ketmasin ---
+.env
+*.env
+!.env.example
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# --- IDE ---
+.idea/
+.vscode/
+
+# --- Frontend ---
+node_modules/
+frontend/dist/
+
+# --- Loglar va vaqtinchalik ---
+*.log
+logs/
+.DS_Store
+Thumbs.db

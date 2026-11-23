@@ -1,0 +1,82 @@
+# CI: har push va pull request'da kod avtomatik tekshiriladi.
+# Biror qadam yiqilsa — GitHub'da qizil ❌, hammasi o'tsa — yashil ✅.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Bir branch'ga ketma-ket push bo'lsa, eski tekshiruv bekor qilinadi (vaqt tejaladi)
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # 1-ish: kod sifati (bazasiz, tez)
+  quality:
+    name: Lint va turlar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      # --locked: uv.lock pyproject.toml ga mos kelmasa — xato (lock yangilash unutilgan)
+      - name: Kutubxonalarni o'rnatish
+        run: uv sync --locked
+
+      - name: Ruff — xatolar
+        run: uv run ruff check .
+
+      - name: Ruff — formatlash
+        run: uv run ruff format --check .
+
+      - name: Mypy — turlar
+        run: uv run mypy app tests
+
+  # 2-ish: testlar haqiqiy PostgreSQL bilan
+  tests:
+    name: Testlar
+    runs-on: ubuntu-latest
+
+    # GitHub test uchun vaqtinchalik PostgreSQL konteyner ko'taradi.
+    # Ish tugagach u o'chiriladi — shuning uchun bu paroldan maxfiy emas.
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: dokon_user
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: dokon_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U dokon_user"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      ENVIRONMENT: test
+      DATABASE_URL: postgresql+asyncpg://dokon_user:ci_password@localhost:5432/dokon_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Kutubxonalarni o'rnatish
+        run: uv sync --locked
+
+      - name: Migratsiyalar (bo'sh bazada boshidan oxirigacha)
+        run: uv run alembic upgrade head
+
+      - name: Testlar va qamrov
+        run: uv run pytest --cov --cov-report=term-missing --cov-fail-under=90
+
