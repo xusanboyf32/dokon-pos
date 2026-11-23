@@ -7,7 +7,7 @@ Kodda maxfiy qiymat bo'lmaydi.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import PostgresDsn
+from pydantic import Field, PostgresDsn, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -32,6 +32,12 @@ class Settings(BaseSettings):
     db_max_overflow: int = 20
     # Osilib qolgan so'rov shuncha millisekunddan keyin to'xtatiladi
     db_statement_timeout_ms: int = 5000
+
+    # --- Auth (A-004, A-005) ---
+    # SecretStr: logga yoki xato xabariga tasodifan chiqib ketmaydi (******** ko'rinadi)
+    jwt_secret_key: SecretStr = Field(min_length=32)
+    access_token_minutes: int = 15
+    refresh_token_hours: int = 24
 
     cors_origins: list[str] = ["http://localhost:5173"]
 

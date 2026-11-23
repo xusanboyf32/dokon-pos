@@ -63,7 +63,7 @@ jobs:
     env:
       ENVIRONMENT: test
       DATABASE_URL: postgresql+asyncpg://dokon_user:ci_password@localhost:5432/dokon_test
-
+      JWT_SECRET_KEY: ci-test-secret-key-faqat-test-uchun-ishlatiladi-1234567890
     steps:
       - uses: actions/checkout@v4
 
