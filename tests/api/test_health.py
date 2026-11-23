@@ -43,3 +43,11 @@ async def test_unknown_route_returns_404(client: AsyncClient) -> None:
     response = await client.get("/mavjud-emas")
 
     assert response.status_code == 404
+    assert response.json()["error"]["code"] == "NOT_FOUND"  # yagona format
+
+
+async def test_wrong_method_returns_405_in_unified_format(client: AsyncClient) -> None:
+    response = await client.delete("/health")
+
+    assert response.status_code == 405
+    assert response.json()["error"]["code"] == "METHOD_NOT_ALLOWED"

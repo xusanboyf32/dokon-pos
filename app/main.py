@@ -6,7 +6,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import APIRouter, Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
@@ -17,6 +17,9 @@ from app.core.database import engine, get_session
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import request_context_middleware
+from app.modules.auth.router import router as auth_router
+
+API_PREFIX = "/api/v1"
 
 
 @asynccontextmanager
@@ -46,6 +49,10 @@ def create_app() -> FastAPI:
     )
     app.middleware("http")(request_context_middleware)
     register_exception_handlers(app)
+
+    api = APIRouter(prefix=API_PREFIX)
+    api.include_router(auth_router)
+    app.include_router(api)
 
     @app.get("/health", tags=["system"])
     async def health(session: AsyncSession = Depends(get_session)) -> JSONResponse:
