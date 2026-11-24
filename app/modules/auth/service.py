@@ -35,6 +35,7 @@ from app.modules.auth.exceptions import (
     SessionInvalidError,
 )
 from app.modules.auth.models import AuthSession, RevokeReason
+from app.modules.problems import service as problems
 
 log = structlog.get_logger()
 
@@ -156,6 +157,7 @@ class AuthService:
             entity=("account", account.id),
             concerns_superadmin=account.is_superadmin,
         )
+        await problems.report_account_locked(self._session, account)  # 🔔 (N-008)
         await self._session.commit()
         log.warning("account_locked", username=username, ip=ip)
         raise AccountLockedError()

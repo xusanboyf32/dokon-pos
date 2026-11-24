@@ -9,6 +9,7 @@ from app.modules.accounts.models import UserAccount
 from app.modules.accounts.validation import normalize_username, validate_new_password
 from app.modules.audit import service as audit
 from app.modules.audit.catalog import AuditAction
+from app.modules.problems import service as problems
 
 
 async def _get_superadmin(session: AsyncSession) -> UserAccount | None:
@@ -48,6 +49,7 @@ async def unlock_superadmin(session: AsyncSession) -> UserAccount:
     account.locked_at = None
     account.failed_attempts = 0
     await _record(session, AuditAction.ACCOUNT_SUPERADMIN_UNLOCKED, account)
+    await problems.resolve_account_locked(session, account.id, actor=None)  # "Tizim"
     await session.commit()
     return account
 

@@ -31,6 +31,7 @@ from app.modules.auth.models import RevokeReason
 from app.modules.auth.service import CurrentUser
 from app.modules.employees import repository as employees_repo
 from app.modules.employees.service import EmployeeArchivedError
+from app.modules.problems import service as problems
 
 
 class UsernameTakenError(ConflictError):
@@ -204,6 +205,7 @@ class AccountService:
             changes={"permanently_locked": (was_locked, False)},
             reason=reason,
         )
+        await problems.resolve_account_locked(self._session, account.id, self._actor)  # N-003
         await self._session.commit()
         return await self._out(account)
 

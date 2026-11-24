@@ -29,6 +29,7 @@ from app.core.exceptions import AppError, NotFoundError
 from app.core.pagination import CursorPage, CursorParams, encode_cursor
 from app.core.request_context import current_request
 from app.core.roles import Role
+from app.modules.accounts import names
 from app.modules.audit import repository
 from app.modules.audit.catalog import AuditAction, Severity, spec_of
 from app.modules.audit.models import AuditEvent
@@ -192,25 +193,16 @@ class AuditService:
         account_ids = {r.actor_account_id for r in rows if r.actor_account_id is not None}
         account_ids |= {r.entity_id for r in rows if r.entity_type == "account"}
         employee_ids = {r.entity_id for r in rows if r.entity_type == "employee"}
-        accounts = await repository.account_names(self._session, account_ids)
-        employees = await repository.employee_names(self._session, employee_ids)
+        accounts = await names.account_names(self._session, account_ids)
+        employees = await names.employee_names(self._session, employee_ids)
 
         def account_label(account_id: int) -> str:
             info = accounts.get(account_id)
-            if info is None:
-                return f"akkaunt #{account_id}"
-            if info.is_superadmin:
-                return "Superadmin"
-            owner = f" ({info.owner_name})" if info.owner_name else ""
-            return f"login «{info.username}»{owner}"
+            return info.login_label if info else f"akkaunt #{account_id}"
 
         def actor_name(account_id: int) -> str:
             info = accounts.get(account_id)
-            if info is None:
-                return f"akkaunt #{account_id}"
-            if info.is_superadmin:
-                return "Superadmin"
-            return info.owner_name or info.username
+            return info.person if info else f"akkaunt #{account_id}"
 
         def entity_name(row: AuditEvent) -> str:
             if row.entity_type == "employee":

@@ -150,8 +150,10 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | N-003 | Muammo sababi bartaraf etilganda O'ZI yopiladi (masalan blok ochilganda). Yopilganlar o'chirilmaydi — tarixda: kim, qachon hal qildi |
 | N-004 | Filtrlar: holat (ochiq — standart / hal qilingan / hammasi), tur, sana oralig'i, xodim; eng yangisi tepada; pagination. Har yozuvda tezkor amal tugmasi (masalan "Blokni ochish") |
 | N-005 | Muammo turlari har modulda qo'shib boriladi. Hozirgi ro'yxat: akkaunt bloklandi (auth); 10 000 so'mdan katta chegirma (kassa). Rejada: kamomad, yaroqlilik muddati, qoldiq tugashi, qaytarishlar ko'payishi |
-| N-006 | Muammo turiga qarab yopiladi: sababi texnik bo'lsa (blok) — o'zi yopiladi; odam qarori kerak bo'lsa (katta chegirma) — faqat admin "Asosli / Asossiz" + izoh bilan yopadi. Yopish ham auditga yoziladi |
+| N-006 | Muammo turiga qarab yopiladi: sababi texnik bo'lsa (blok) — o'zi yopiladi; odam qarori kerak bo'lsa (katta chegirma) — faqat admin "Asosli / Asossiz" + izoh bilan yopadi. Yopish ham auditga yoziladi — **O'zgartirildi: N-009** |
 | N-007 | *(Kassa'da yakunlanadi)* Katta chegirma: savdo to'xtamaydi, sabab majburiy, keyin admin ko'radi (oldindan PIN-tasdiq emas). Chegara: summa **yoki** foiz (masalan 10 000 so'm yoki 10%), qiymati sozlamada |
+| N-008 | **Muammolar = admin bajarishi kerak bo'lgan ishlar ro'yxati.** 5 qoida: (1) faqat harakat talab qiladigan narsa kiradi — "admin nima qilishi kerak?" savoliga javob bo'lmasa, faqat audit; (2) har muammoda bitta tezkor tugma (`action`, masalan "Blokni ochish"); (3) sabab bartaraf etilsa — o'zi yopiladi; (4) takrorlansa — yangi qator emas, `occurrences` (N-002: `group_key` + qisman unikal indeks + upsert); (5) yopilgan o'chirilmaydi — kim, qachon, qanday yopgani qoladi. Superadminga oid muammoni admin ko'rmaydi. Sahifalash — oddiy (page/size + total) |
+| N-009 | Qo'lda yopish ("Asosli/Asossiz" yoki oddiy "Ko'rib chiqildi" + izoh) — **Kassa bosqichida**, birinchi qo'lda yopiladigan tur (katta chegirma) bilan birga hal qilinadi. Hozir yagona tur — "Akkaunt bloklandi" (A-032): blokda o'zi ochiladi, admin/superadmin (CLI ham) blokni ochganda o'zi yopiladi. Rejadagi turlar: katta chegirma (Kassa), kamomad (Buxgalteriya), qoldiq tugashi va yaroqlilik muddati (Ombor) |
 
 ## Operatsion va nazorat talablari
 

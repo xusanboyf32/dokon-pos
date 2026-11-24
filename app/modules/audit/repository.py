@@ -1,6 +1,5 @@
 """Audit jurnali uchun bazaga so'rovlar. Biznes-qoida yo'q — faqat SQL."""
 
-from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import Select, and_, exists, or_, select, tuple_
@@ -115,41 +114,3 @@ async def _fetch_page(
         stmt = stmt.where(tuple_(AuditEvent.occurred_at, AuditEvent.id) < page.after)
     stmt = stmt.order_by(AuditEvent.occurred_at.desc(), AuditEvent.id.desc()).limit(page.limit + 1)
     return list((await session.execute(stmt)).scalars())
-
-
-# ------------------------------------------------------------------ ismlar (N+1 siz)
-@dataclass(frozen=True, slots=True)
-class AccountName:
-    username: str
-    is_superadmin: bool
-    owner_name: str | None  # xodimning ismi (superadmin'da yo'q)
-
-
-def _full_name(employee: Employee) -> str:
-    return f"{employee.first_name} {employee.last_name}"
-
-
-async def account_names(session: AsyncSession, ids: set[int]) -> dict[int, AccountName]:
-    """Bitta so'rov bilan hamma akkauntlar va ularning egalari (50 ta yozuv → 1 so'rov)."""
-    if not ids:
-        return {}
-    stmt = (
-        select(UserAccount, Employee)
-        .outerjoin(Employee, Employee.id == UserAccount.employee_id)
-        .where(UserAccount.id.in_(ids))
-    )
-    return {
-        account.id: AccountName(
-            username=account.username,
-            is_superadmin=account.is_superadmin,
-            owner_name=_full_name(employee) if employee else None,
-        )
-        for account, employee in (await session.execute(stmt)).all()
-    }
-
-
-async def employee_names(session: AsyncSession, ids: set[int]) -> dict[int, str]:
-    if not ids:
-        return {}
-    stmt = select(Employee).where(Employee.id.in_(ids))
-    return {e.id: _full_name(e) for e in (await session.execute(stmt)).scalars()}
