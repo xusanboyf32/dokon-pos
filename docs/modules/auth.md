@@ -88,6 +88,7 @@ Partial unique index: xodimda `valid_to IS NULL` davr bittadan ko'p bo'lmaydi.
 | PUT | /api/v1/employees/{id}/photo | superadmin, admin | rasmni almashtirish |
 | POST | /api/v1/employees/{id}/position | superadmin, admin | lavozim/maosh o'zgarishi (E-010) |
 | GET | /api/v1/employees/{id}/positions | superadmin, admin | lavozim va maosh tarixi |
+| GET | /api/v1/employees/{id}/history | superadmin, admin | "Tarix" tabi: xodim va uning loginiga oid audit yozuvlari, cursor; `include_logins` (AU-019) |
 | POST | /api/v1/employees/{id}/archive, /restore | superadmin, admin | arxivlash / qaytarish (E-005) |
 | GET | /api/v1/accounts | superadmin, admin | ro'yxat: `status` (active/locked/deleted), `search` (username yoki ism), `role`, `created_from/to`, `page`, `size`; har qatorda `state` va `locked_until` (A-031) |
 | POST | /api/v1/accounts | superadmin, admin | login yaratish: `employee_id`, `username`, `password`, `password_confirm` (A-027, A-028) |

@@ -25,7 +25,7 @@ from typing import Any, Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import AppError
+from app.core.exceptions import AppError, NotFoundError
 from app.core.pagination import CursorPage, CursorParams, encode_cursor
 from app.core.request_context import current_request
 from app.core.roles import Role
@@ -153,11 +153,30 @@ class AuditService:
 
     async def search(self, filters: AuditFilters, page: CursorParams) -> CursorPage[AuditEventOut]:
         rows = await repository.search(
-            self._session,
-            filters,
-            page,
-            include_superadmin_only=self._viewer.role == Role.SUPERADMIN,
+            self._session, filters, page, include_superadmin_only=self._sees_superadmin
         )
+        return await self._page(rows, page)
+
+    async def employee_history(
+        self, employee_id: int, page: CursorParams, *, include_logins: bool = False
+    ) -> CursorPage[AuditEventOut]:
+        """Xodim kartochkasidagi "Tarix" tabi (AU-019)."""
+        if not await repository.employee_exists(self._session, employee_id):
+            raise NotFoundError("Xodim topilmadi")
+        rows = await repository.employee_history(
+            self._session,
+            employee_id,
+            page,
+            include_logins=include_logins,
+            include_superadmin_only=self._sees_superadmin,
+        )
+        return await self._page(rows, page)
+
+    @property
+    def _sees_superadmin(self) -> bool:
+        return self._viewer.role == Role.SUPERADMIN
+
+    async def _page(self, rows: list[AuditEvent], page: CursorParams) -> CursorPage[AuditEventOut]:
         has_more = len(rows) > page.limit
         rows = rows[: page.limit]
         items = await self._to_out(rows)
