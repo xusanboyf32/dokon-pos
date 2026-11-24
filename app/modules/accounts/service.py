@@ -5,7 +5,7 @@ foydalanuvchi faqat o'zidan PAST darajadagi akkauntni boshqaradi (`can_manage`).
 Admin boshqa admin'ning (o'zining ham) parolini o'zgartira olmaydi — buni superadmin qiladi.
 """
 
-from datetime import date, timedelta
+from datetime import date
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -24,12 +24,14 @@ from app.modules.accounts.schemas import (
     PasswordReset,
 )
 from app.modules.accounts.validation import normalize_username, validate_new_password
+from app.modules.audit import service as audit
+from app.modules.audit.catalog import AuditAction
 from app.modules.auth import repository as auth_repo
-from app.modules.auth.lockout import LoginGuard
 from app.modules.auth.models import RevokeReason
 from app.modules.auth.service import CurrentUser
 from app.modules.employees import repository as employees_repo
 from app.modules.employees.service import EmployeeArchivedError
+from app.modules.problems import service as problems
 
 
 class UsernameTakenError(ConflictError):
@@ -47,26 +49,19 @@ class AccountDeletedError(AppError):
     message = "Login o'chirilgan. Kerak bo'lsa, xodimga yangi login yarating"
 
 
-def _state(account: UserAccount, locked_seconds: int | None) -> AccountState:
+def _state(account: UserAccount) -> AccountState:
     if account.deleted_at is not None:
         return AccountState.DELETED
     if account.locked_at is not None:
         return AccountState.LOCKED
-    if locked_seconds:
-        return AccountState.TEMPORARILY_LOCKED
     return AccountState.ACTIVE
 
 
-def to_out(account: UserAccount, locked_seconds: int | None = None) -> AccountOut:
+def to_out(account: UserAccount) -> AccountOut:
     employee = account.employee
     assert employee is not None  # _visible() faqat xodim akkauntlarini qaytaradi
     role = Role(employee.role)
-    state = _state(account, locked_seconds)
-    locked_until = (
-        utcnow() + timedelta(seconds=locked_seconds)
-        if state is AccountState.TEMPORARILY_LOCKED and locked_seconds
-        else None
-    )
+    state = _state(account)
     return AccountOut(
         id=account.id,
         username=account.username,
@@ -75,7 +70,7 @@ def to_out(account: UserAccount, locked_seconds: int | None = None) -> AccountOu
         role=role,
         role_label=ROLE_LABELS[role],
         state=state,
-        locked_until=locked_until,
+        failed_attempts=account.failed_attempts,
         last_login_at=account.last_login_at,
         created_at=account.created_at,
         deleted_at=account.deleted_at,
@@ -83,10 +78,9 @@ def to_out(account: UserAccount, locked_seconds: int | None = None) -> AccountOu
 
 
 class AccountService:
-    def __init__(self, session: AsyncSession, actor: CurrentUser, guard: LoginGuard) -> None:
+    def __init__(self, session: AsyncSession, actor: CurrentUser) -> None:
         self._session = session
         self._actor = actor
-        self._guard = guard
 
     # ------------------------------------------------------------------ yordamchi
     def _require_manage(self, role: Role | str) -> None:
@@ -105,9 +99,25 @@ class AccountService:
         self._require_manage(account.employee.role)
         return account
 
+    async def _record(
+        self,
+        action: AuditAction,
+        account: UserAccount,
+        *,
+        changes: dict[str, tuple[object, object]] | None = None,
+        reason: str | None = None,
+    ) -> None:
+        await audit.record(
+            self._session,
+            actor=self._actor,
+            action=action,
+            entity=("account", account.id),
+            changes=changes,
+            reason=reason,
+        )
+
     async def _out(self, account: UserAccount) -> AccountOut:
-        seconds = await self._guard.locked_seconds_left([account.username])
-        return to_out(account, seconds.get(account.username))
+        return to_out(account)
 
     # ------------------------------------------------------------------ o'qish
     async def search(
@@ -129,8 +139,7 @@ class AccountService:
             created_from=created_from,
             created_to=created_to,
         )
-        seconds = await self._guard.locked_seconds_left([a.username for a in accounts])
-        items = [to_out(a, seconds.get(a.username)) for a in accounts]
+        items = [to_out(a) for a in accounts]
         return Page[AccountOut].build(items, total, params)
 
     async def get(self, account_id: int) -> AccountOut:
@@ -156,6 +165,12 @@ class AccountService:
             employee_id=employee.id, username=username, password_hash=hash_password(password)
         )
         self._session.add(account)
+        await self._session.flush()  # account.id kerak
+        await self._record(
+            AuditAction.ACCOUNT_CREATED,
+            account,
+            changes={"username": (None, username), "employee_id": (None, employee.id)},
+        )
         await self._session.commit()
         return await self.get(account.id)
 
@@ -172,17 +187,26 @@ class AccountService:
         await auth_repo.revoke_active_sessions_of_account(
             self._session, account.id, RevokeReason.PASSWORD_CHANGED, utcnow()
         )
+        await self._record(AuditAction.ACCOUNT_PASSWORD_RESET, account)  # parolning o'zi — yo'q
         await self._session.commit()
         return await self._out(account)
 
-    async def unlock(self, account_id: int) -> AccountOut:
-        """Doimiy blok ham, vaqtinchalik blok va hisoblagichlar ham tozalanadi (7e)."""
+    async def unlock(self, account_id: int, *, reason: str) -> AccountOut:
+        """Blok ochiladi va xato urinishlar hisoblagichi 0 ga tushadi (A-032)."""
         account = await self._get_manageable(account_id)
         if account.deleted_at is not None:
             raise AccountDeletedError()
+        was_locked = account.locked_at is not None
         account.locked_at = None
+        account.failed_attempts = 0
+        await self._record(
+            AuditAction.ACCOUNT_UNLOCKED,
+            account,
+            changes={"permanently_locked": (was_locked, False)},
+            reason=reason,
+        )
+        await problems.resolve_account_locked(self._session, account.id, self._actor)  # N-003
         await self._session.commit()
-        await self._guard.reset(account.username)
         return await self._out(account)
 
     async def delete(self, account_id: int) -> None:
@@ -196,4 +220,5 @@ class AccountService:
         await auth_repo.revoke_active_sessions_of_account(
             self._session, account.id, RevokeReason.ACCOUNT_DISABLED, now
         )
+        await self._record(AuditAction.ACCOUNT_DELETED, account)
         await self._session.commit()

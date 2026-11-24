@@ -18,8 +18,6 @@ _settings = Settings()
 if _settings.test_database_url is not None:
     os.environ["DATABASE_URL"] = str(_settings.test_database_url)
 os.environ["ENVIRONMENT"] = "test"
-# Redis: testlar alohida baza raqamida (15) — ishchi ma'lumotlarga tegmaydi
-os.environ["REDIS_URL"] = str(_settings.test_redis_url or "redis://localhost:6379/15")
 # Test rasmlari loyiha papkasiga emas, vaqtinchalik papkaga tushadi
 os.environ["MEDIA_ROOT"] = tempfile.mkdtemp(prefix="dokon-test-media-")
 
@@ -39,14 +37,11 @@ import pytest  # noqa: E402
 from alembic.config import Config as AlembicConfig  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from httpx import ASGITransport, AsyncClient  # noqa: E402
-from redis.asyncio import Redis  # noqa: E402
 from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
 from alembic import command  # noqa: E402
 from app.core.database import engine, get_session  # noqa: E402
-from app.core.redis import get_redis  # noqa: E402
 from app.main import create_app  # noqa: E402
-from app.modules.auth.lockout import LoginGuard  # noqa: E402
 from app.modules.auth.service import AuthService  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -102,41 +97,48 @@ async def db_session(migrated_database: None) -> AsyncIterator[AsyncSession]:
             await transaction.rollback()
 
 
-# ------------------------------------------------------------------ redis
+# ------------------------------------------------------------------ auth
 @pytest.fixture
-async def redis_client() -> AsyncIterator[Redis]:
-    """Har test toza Redis bazasi bilan boshlanadi va tugaydi."""
-    client = Redis.from_url(os.environ["REDIS_URL"], decode_responses=True)
-    await client.flushdb()
-    try:
-        yield client
-    finally:
-        await client.flushdb()
-        await client.aclose()
-
-
-@pytest.fixture
-def guard(redis_client: Redis) -> LoginGuard:
-    return LoginGuard(redis_client)
-
-
-@pytest.fixture
-def service(db_session: AsyncSession, guard: LoginGuard) -> AuthService:
-    return AuthService(db_session, guard)
+def service(db_session: AsyncSession) -> AuthService:
+    return AuthService(db_session)
 
 
 # ------------------------------------------------------------------ API
 @pytest.fixture
-async def api(
-    app: FastAPI, db_session: AsyncSession, redis_client: Redis
-) -> AsyncIterator[AsyncClient]:
+async def api(app: FastAPI, db_session: AsyncSession) -> AsyncIterator[AsyncClient]:
     """Ilova testning tranzaksiyali sessiyasidan foydalanadi — test oxirida hammasi ROLLBACK."""
 
     async def _test_session() -> AsyncIterator[AsyncSession]:
         yield db_session
 
     app.dependency_overrides[get_session] = _test_session
-    app.dependency_overrides[get_redis] = lambda: redis_client
     transport = ASGITransport(app=app, raise_app_exceptions=False)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+
+
+# ------------------------------------------------------------------ audit uchun aktyor
+@pytest.fixture
+async def actor_account_id(db_session: AsyncSession) -> int:
+    """Servis testlarida "kim qildi" — bazadagi haqiqiy akkaunt bo'lishi shart.
+
+    Audit jurnali `actor_account_id` ni FK bilan tekshiradi (soxta id=0 o'tmaydi).
+    Xodim anonimlashtirilgan — hech qaysi ro'yxatda ko'rinmaydi va testlarga xalaqit bermaydi.
+    """
+    from app.core.time import utcnow
+    from app.modules.accounts.models import UserAccount
+    from tests.integration.test_employees_table import make_employee
+    from tests.integration.test_user_accounts_table import FAKE_HASH
+
+    now = utcnow()
+    employee = make_employee(
+        role="admin", phone=None, photo_path=None, archived_at=now, anonymized_at=now
+    )
+    db_session.add(employee)
+    await db_session.flush()
+    account = UserAccount(
+        employee_id=employee.id, username="audit_actor", password_hash=FAKE_HASH, deleted_at=now
+    )
+    db_session.add(account)
+    await db_session.flush()
+    return account.id

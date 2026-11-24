@@ -10,14 +10,11 @@ from collections.abc import Awaitable, Callable
 
 from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
 from app.core.exceptions import ForbiddenError, UnauthorizedError
-from app.core.redis import get_redis
 from app.core.roles import Role
-from app.modules.auth.lockout import LoginGuard
 from app.modules.auth.service import AuthService, CurrentUser
 
 # auto_error=False: token yo'q bo'lsa FastAPI'ning o'z 403 xatosi emas,
@@ -25,15 +22,8 @@ from app.modules.auth.service import AuthService, CurrentUser
 _bearer = HTTPBearer(auto_error=False)
 
 
-def get_login_guard(redis: Redis = Depends(get_redis)) -> LoginGuard:
-    return LoginGuard(redis)
-
-
-def get_auth_service(
-    session: AsyncSession = Depends(get_session),
-    guard: LoginGuard = Depends(get_login_guard),
-) -> AuthService:
-    return AuthService(session, guard)
+def get_auth_service(session: AsyncSession = Depends(get_session)) -> AuthService:
+    return AuthService(session)
 
 
 async def get_current_user(

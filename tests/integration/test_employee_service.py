@@ -53,8 +53,8 @@ def media_file(relative_url: str | None) -> Path:
     return Path(get_settings().media_root) / relative
 
 
-def actor(role: Role) -> CurrentUser:
-    return CurrentUser(account_id=0, session_id=uuid.uuid4(), role=role, employee_id=None)
+def actor(role: Role, account_id: int) -> CurrentUser:
+    return CurrentUser(account_id=account_id, session_id=uuid.uuid4(), role=role, employee_id=None)
 
 
 def new_employee(**overrides: object) -> EmployeeCreate:
@@ -72,13 +72,13 @@ def new_employee(**overrides: object) -> EmployeeCreate:
 
 
 @pytest.fixture
-def admin(db_session: AsyncSession) -> EmployeeService:
-    return EmployeeService(db_session, actor(Role.ADMIN))
+def admin(db_session: AsyncSession, actor_account_id: int) -> EmployeeService:
+    return EmployeeService(db_session, actor(Role.ADMIN, actor_account_id))
 
 
 @pytest.fixture
-def boss(db_session: AsyncSession) -> EmployeeService:
-    return EmployeeService(db_session, actor(Role.SUPERADMIN))
+def boss(db_session: AsyncSession, actor_account_id: int) -> EmployeeService:
+    return EmployeeService(db_session, actor(Role.SUPERADMIN, actor_account_id))
 
 
 async def position_rows(session: AsyncSession, employee_id: int) -> list[EmployeePosition]:
@@ -139,7 +139,9 @@ async def test_invalid_photo_is_rejected_and_nothing_saved(
     with pytest.raises(InvalidPhotoError):
         await admin.create(new_employee(), content)
 
-    assert await db_session.scalar(select(func.count()).select_from(Employee)) == 0
+    # Anonimlashtirilgani — audit uchun yordamchi aktyor (conftest), u hisobga olinmaydi
+    visible = select(func.count()).select_from(Employee).where(Employee.anonymized_at.is_(None))
+    assert await db_session.scalar(visible) == 0
 
 
 async def test_phone_must_be_unique(admin: EmployeeService) -> None:
@@ -167,8 +169,10 @@ async def test_nobody_can_create_hidden_or_non_employee_roles(
         await boss.create(new_employee(role=role), make_photo())
 
 
-async def test_low_roles_cannot_manage_employees(db_session: AsyncSession) -> None:
-    kassir = EmployeeService(db_session, actor(Role.KASSIR))
+async def test_low_roles_cannot_manage_employees(
+    db_session: AsyncSession, actor_account_id: int
+) -> None:
+    kassir = EmployeeService(db_session, actor(Role.KASSIR, actor_account_id))
 
     with pytest.raises(ForbiddenError):
         await kassir.create(new_employee(), make_photo())

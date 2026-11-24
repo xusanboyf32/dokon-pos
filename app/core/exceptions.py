@@ -80,15 +80,59 @@ async def _app_error_handler(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
+# Pydantic'ning inglizcha xabarlari o'rniga o'zbekcha (eng ko'p uchraydiganlari).
+# Bu yerda yo'q tur — Pydantic xabari o'zgarishsiz qoladi.
+_UZ_MESSAGES: dict[str, str] = {
+    "missing": "Bu maydon majburiy",
+    "string_too_short": "Juda qisqa",
+    "string_too_long": "Juda uzun",
+    "string_type": "Matn bo'lishi kerak",
+    "int_parsing": "Butun son bo'lishi kerak",
+    "int_type": "Butun son bo'lishi kerak",
+    "decimal_parsing": "Son bo'lishi kerak",
+    "decimal_type": "Son bo'lishi kerak",
+    "decimal_max_places": "Ko'pi bilan 2 ta kasr xona (tiyin)",
+    "date_parsing": "Sana YYYY-MM-DD ko'rinishida bo'lishi kerak",
+    "date_from_datetime_parsing": "Sana YYYY-MM-DD ko'rinishida bo'lishi kerak",
+    "bool_parsing": "true yoki false bo'lishi kerak",
+    "enum": "Ruxsat etilmagan qiymat",
+    "greater_than_equal": "Juda kichik qiymat",
+    "less_than_equal": "Juda katta qiymat",
+}
+
+
 async def _validation_error_handler(request: Request, exc: Exception) -> JSONResponse:
     assert isinstance(exc, RequestValidationError)
+    errors = exc.errors()
+
+    # So'rov matni JSON sifatida o'qilmadi (qavs yopilmagan, ortiqcha vergul...) —
+    # maydonlar bo'yicha emas, bitta tushunarli xabar
+    broken = next((e for e in errors if e["type"] == "json_invalid"), None)
+    if broken is not None:
+        loc = broken["loc"]
+        position = loc[1] if len(loc) > 1 else None
+        return JSONResponse(
+            status_code=422,
+            content=_error_body(
+                request,
+                "INVALID_JSON",
+                "So'rov matni noto'g'ri yozilgan (JSON). Qavslar, qo'shtirnoq va vergullarni "
+                "tekshiring",
+                {"position": position},
+            ),
+        )
+
     fields = [
         {
             "field": ".".join(str(p) for p in err["loc"][1:]),
-            # Pydantic o'z validatorlarimiz xabariga "Value error, " qo'shadi — olib tashlaymiz
-            "message": str(err["msg"]).removeprefix("Value error, "),
+            # O'zimizning validator xabari (Pydantic unga "Value error, " qo'shadi) yoki tarjima
+            "message": (
+                str(err["msg"]).removeprefix("Value error, ")
+                if err["type"] == "value_error"
+                else _UZ_MESSAGES.get(err["type"], str(err["msg"]))
+            ),
         }
-        for err in exc.errors()
+        for err in errors
     ]
     return JSONResponse(
         status_code=422,

@@ -3,7 +3,6 @@
 import uuid
 
 import pytest
-from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import ForbiddenError, NotFoundError
@@ -30,7 +29,6 @@ from app.modules.accounts.validation import (
     PasswordMismatchError,
 )
 from app.modules.auth.exceptions import AccountLockedError, InvalidCredentialsError
-from app.modules.auth.lockout import LoginGuard
 from app.modules.auth.models import RevokeReason
 from app.modules.auth.service import AuthService, CurrentUser
 from app.modules.employees.models import Employee
@@ -42,18 +40,18 @@ PAGE = PageParams(page=1, size=20)
 NEW = "yangi123"
 
 
-def actor(role: Role) -> CurrentUser:
-    return CurrentUser(account_id=0, session_id=uuid.uuid4(), role=role, employee_id=None)
+def actor(role: Role, account_id: int) -> CurrentUser:
+    return CurrentUser(account_id=account_id, session_id=uuid.uuid4(), role=role, employee_id=None)
 
 
 @pytest.fixture
-def admin(db_session: AsyncSession, guard: LoginGuard) -> AccountService:
-    return AccountService(db_session, actor(Role.ADMIN), guard)
+def admin(db_session: AsyncSession, actor_account_id: int) -> AccountService:
+    return AccountService(db_session, actor(Role.ADMIN, actor_account_id))
 
 
 @pytest.fixture
-def boss(db_session: AsyncSession, guard: LoginGuard) -> AccountService:
-    return AccountService(db_session, actor(Role.SUPERADMIN), guard)
+def boss(db_session: AsyncSession, actor_account_id: int) -> AccountService:
+    return AccountService(db_session, actor(Role.SUPERADMIN, actor_account_id))
 
 
 async def add_employee(
@@ -175,28 +173,26 @@ async def test_admin_cannot_create_login_for_admin(
 
 # ================================================================== ro'yxat
 async def test_list_shows_states_and_hides_superadmin(
-    db_session: AsyncSession, admin: AccountService, guard: LoginGuard
+    db_session: AsyncSession, admin: AccountService
 ) -> None:
     await create_superadmin(db_session, "xusanboy", "1234", "1234")
     active = await create_user(db_session, username="faol", phone="+998901000001")
-    temp = await create_user(db_session, username="vaqtincha", phone="+998901000002")
-    perm = await create_user(db_session, username="doimiy", phone="+998901000003")
+    warned = await create_user(db_session, username="adashgan", phone="+998901000002")
+    perm = await create_user(db_session, username="bloklangan", phone="+998901000003")
     gone = await create_user(db_session, username="ketgan", phone="+998901000004")
+    warned.failed_attempts = 7
     perm.locked_at = utcnow()
     gone.deleted_at = utcnow()
     await db_session.flush()
-    await guard.lock_temporarily("vaqtincha")
 
     page = await admin.search(PAGE)
 
-    states = {a.username: a.state for a in page.items}
+    states = {a.username: (a.state, a.failed_attempts) for a in page.items}
     assert states == {
-        "faol": AccountState.ACTIVE,
-        "vaqtincha": AccountState.TEMPORARILY_LOCKED,
-        "doimiy": AccountState.LOCKED,
+        "faol": (AccountState.ACTIVE, 0),
+        "adashgan": (AccountState.ACTIVE, 7),  # admin blokka yaqinlashganini ko'radi
+        "bloklangan": (AccountState.LOCKED, 0),
     }
-    [temp_out] = [a for a in page.items if a.id == temp.id]
-    assert temp_out.locked_until is not None
     assert [a.id for a in (await admin.search(PAGE, status=AccountStatusFilter.LOCKED)).items] == [
         perm.id
     ]
@@ -215,18 +211,6 @@ async def test_list_search_and_role_filter(db_session: AsyncSession, admin: Acco
     assert by_name.total == 2
     kassirs = await admin.search(PAGE, role=Role.KASSIR)
     assert [a.username for a in kassirs.items] == ["anvar"]
-
-
-async def test_list_survives_redis_outage(db_session: AsyncSession) -> None:
-    await create_user(db_session)
-    dead_redis = Redis.from_url("redis://localhost:1/0", socket_connect_timeout=0.2)
-    try:
-        service = AccountService(db_session, actor(Role.ADMIN), LoginGuard(dead_redis))
-        page = await service.search(PAGE)
-    finally:
-        await dead_redis.aclose()
-
-    assert page.items[0].state is AccountState.ACTIVE  # fail-open: ro'yxat baribir ochiladi
 
 
 async def test_superadmin_account_is_not_found(
@@ -286,20 +270,19 @@ async def test_deleted_login_password_cannot_be_reset(
 
 
 # ================================================================== blokni ochish
-async def test_unlock_permanent_and_temporary_lock(
-    db_session: AsyncSession, admin: AccountService, guard: LoginGuard, service: AuthService
+async def test_unlock_clears_lock_and_counter(
+    db_session: AsyncSession, admin: AccountService, service: AuthService
 ) -> None:
     account = await create_user(db_session)
     account.locked_at = utcnow()
+    account.failed_attempts = 10
     await db_session.flush()
-    await guard.lock_temporarily("anvar")
     with pytest.raises(AccountLockedError):
         await service.login("anvar", PASSWORD, **CLIENT)
 
-    out = await admin.unlock(account.id)
+    out = await admin.unlock(account.id, reason="Tekshirildi")
 
-    assert out.state is AccountState.ACTIVE
-    assert await guard.locked_seconds_left(["anvar"]) == {}
+    assert (out.state, out.failed_attempts) == (AccountState.ACTIVE, 0)
     await login(service)
 
 
@@ -311,9 +294,9 @@ async def test_admin_cannot_unlock_admin(
     await db_session.flush()
 
     with pytest.raises(ForbiddenError):
-        await admin.unlock(other_admin.id)
+        await admin.unlock(other_admin.id, reason="Tekshirildi")
 
-    assert (await boss.unlock(other_admin.id)).state is AccountState.ACTIVE
+    assert (await boss.unlock(other_admin.id, reason="Tekshirildi")).state is AccountState.ACTIVE
 
 
 # ================================================================== o'chirish

@@ -14,10 +14,10 @@ from app.modules.accounts.schemas import (
     AccountOut,
     AccountStatusFilter,
     PasswordReset,
+    UnlockRequest,
 )
 from app.modules.accounts.service import AccountService
-from app.modules.auth.dependencies import get_login_guard, require_roles
-from app.modules.auth.lockout import LoginGuard
+from app.modules.auth.dependencies import require_roles
 from app.modules.auth.service import CurrentUser
 
 router = APIRouter(prefix="/accounts", tags=["Parollar"])
@@ -28,9 +28,8 @@ _admin = require_roles(Role.ADMIN)
 def get_service(
     session: AsyncSession = Depends(get_session),
     actor: CurrentUser = Depends(_admin),
-    guard: LoginGuard = Depends(get_login_guard),
 ) -> AccountService:
-    return AccountService(session, actor, guard)
+    return AccountService(session, actor)
 
 
 Service = Annotated[AccountService, Depends(get_service)]
@@ -80,8 +79,9 @@ async def reset_password(account_id: int, data: PasswordReset, service: Service)
 
 
 @router.post("/{account_id}/unlock", response_model=AccountOut, summary="Blokni ochish")
-async def unlock(account_id: int, service: Service) -> AccountOut:
-    return await service.unlock(account_id)
+async def unlock(account_id: int, data: UnlockRequest, service: Service) -> AccountOut:
+    """Doimiy va vaqtincha blok ochiladi. Sabab majburiy (AU-006)."""
+    return await service.unlock(account_id, reason=data.reason)
 
 
 @router.delete("/{account_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Loginni o'chirish")

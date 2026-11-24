@@ -77,3 +77,24 @@ async def test_unhandled_error_hides_internal_details(client: AsyncClient) -> No
     assert error["code"] == "INTERNAL_ERROR"
     # Ichki xato matni foydalanuvchiga ko'rinmasligi shart
     assert "maxfiy" not in response.text
+
+
+async def test_broken_json_gets_clear_uzbek_message(api: AsyncClient) -> None:
+    response = await api.post(
+        "/api/v1/auth/login",
+        content='{"username": "anvar", "password": ',
+        headers={"Content-Type": "application/json"},
+    )
+
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "INVALID_JSON"
+    assert error["message"].startswith("So'rov matni noto'g'ri yozilgan (JSON)")
+    assert isinstance(error["details"]["position"], int)
+
+
+async def test_missing_field_message_is_uzbek(api: AsyncClient) -> None:
+    response = await api.post("/api/v1/auth/login", json={"username": "anvar"})
+
+    fields = response.json()["error"]["details"]["fields"]
+    assert {"field": "password", "message": "Bu maydon majburiy"} in fields

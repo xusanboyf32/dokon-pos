@@ -1,10 +1,14 @@
 """Auth endpoint'lari HTTP darajasida: status kodlar, cookie, xato formati."""
 
+from datetime import date
+from decimal import Decimal
+
 import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.roles import Role
+from app.modules.employees.models import EmployeePosition
 from tests.integration.test_auth_service import PASSWORD, create_user
 
 LOGIN = "/api/v1/auth/login"
@@ -122,3 +126,50 @@ async def test_logout_then_token_and_cookie_stop_working(
     api.cookies.set("refresh_token", str(refresh_cookie), path="/api/v1/auth")
     stale = await api.post(REFRESH)
     assert stale.status_code == 401
+
+
+async def test_employee_sees_only_own_position_history(
+    api: AsyncClient, db_session: AsyncSession
+) -> None:
+    """AU-020: "Mening sahifam" — faqat o'z lavozim/maosh davrlari."""
+    me = await create_user(db_session, username="anvar")
+    other = await create_user(db_session, username="vali", phone="+998902222222")
+    assert me.employee_id is not None and other.employee_id is not None
+    db_session.add_all(
+        [
+            EmployeePosition(
+                employee_id=me.employee_id,
+                role="kassir",
+                salary=Decimal("3000000.00"),
+                valid_from=date(2026, 3, 1),
+                valid_to=date(2026, 8, 31),
+            ),
+            EmployeePosition(
+                employee_id=me.employee_id,
+                role="kassir",
+                salary=Decimal("3500000.00"),
+                valid_from=date(2026, 9, 1),
+            ),
+            EmployeePosition(
+                employee_id=other.employee_id,
+                role="kassir",
+                salary=Decimal("9000000.00"),
+                valid_from=date(2026, 1, 1),
+            ),
+        ]
+    )
+    await db_session.flush()
+    login = await api.post("/api/v1/auth/login", json={"username": "anvar", "password": PASSWORD})
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    response = await api.get("/api/v1/auth/me/positions", headers=headers)
+
+    assert response.status_code == 200
+    assert [(p["salary"], p["valid_to"]) for p in response.json()] == [
+        ("3500000.00", None),
+        ("3000000.00", "2026-08-31"),
+    ]
+
+
+async def test_my_positions_requires_login(api: AsyncClient) -> None:
+    assert (await api.get("/api/v1/auth/me/positions")).status_code == 401

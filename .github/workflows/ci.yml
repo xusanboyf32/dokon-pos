@@ -43,7 +43,8 @@ jobs:
     name: Testlar
     runs-on: ubuntu-latest
 
-    # GitHub test uchun vaqtinchalik PostgreSQL va Redis konteynerlarini ko'taradi.
+    # GitHub test uchun vaqtinchalik PostgreSQL konteynerini ko'taradi.
+    # Redis kerak emas: login himoyasi bazada (A-032). Celery qo'shilganda qaytadi.
     # Ish tugagach u o'chiriladi — shuning uchun bu paroldan maxfiy emas.
     services:
       postgres:
@@ -59,21 +60,11 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
 
     env:
       ENVIRONMENT: test
       DATABASE_URL: postgresql+asyncpg://dokon_user:ci_password@localhost:5432/dokon_test
       JWT_SECRET_KEY: ci-test-secret-key-faqat-test-uchun-ishlatiladi-1234567890
-      REDIS_URL: redis://localhost:6379/15
     steps:
       - uses: actions/checkout@v4
 

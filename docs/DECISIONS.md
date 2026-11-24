@@ -12,7 +12,7 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | D-004 | PostgreSQL + SQLAlchemy 2.0 async + asyncpg + Alembic | Ishonchli, bloklash/constraint'lar, migratsiya |
 | D-005 | Pul: `Numeric(14,2)` + `Decimal`, UZS | Float'da tiyinlar yo'qoladi |
 | D-006 | Vaqt: `timestamptz`, UTC'da saqlash, Toshkent vaqtida ko'rsatish | Vaqt zonasi siljishi bo'lmaydi |
-| D-007 | Redis: lockout/rate-limit, Celery broker. **Qoldiq keshlanmaydi** — doim bazadan | Spetsifikatsiya talabi |
+| D-007 | Redis: Celery broker (11-bosqich); login himoyasi bazada (A-032). **Qoldiq keshlanmaydi** — doim bazadan | Spetsifikatsiya talabi |
 | D-008 | Mahsulot nomi unikal (bitta harf farqi = yangi mahsulot); ID'lar `IDENTITY` bilan ketma-ket | Parallel qo'shishda ham xatosiz |
 | D-009 | Biznes-ob'ektlar soft delete; pul/savdo yozuvlari hech qachon o'chirilmaydi | Tarix va audit |
 | D-010 | Audit jurnali: faqat qo'shiladi, tahrirlanmaydi, o'chirilmaydi | Nazorat, kamomad tekshiruvi |
@@ -47,27 +47,28 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | A-008 | Parol hech qachon ko'rsatilmaydi; admin faqat yangi parol qo'yadi (dastlabki promptdagi "ko'z tugmasi" talabi xavfsizlik sababli bekor qilindi) |
 | A-009 | Parol kamida 4 belgi (batafsil: A-017) |
 | A-010 | Username kichik harfda, unikal, **qayta ishlatilmaydi** (ketgan xodimning username'i yangi xodimga berilmaydi) |
-| A-011 | Lockout: 5 ketma-ket xato yoki 1 daqiqada 5+ urinish → 10 daqiqa blok. Shundan keyin 3 xato → doimiy blok (admin ochadi; superadmin'ni faqat server buyrug'i ochadi). Faol sessiyalar uzilmaydi |
+| A-011 | Lockout: 5 ketma-ket xato yoki 1 daqiqada 5+ urinish → 10 daqiqa blok. Shundan keyin 3 xato → doimiy blok (admin ochadi; superadmin'ni faqat server buyrug'i ochadi). Faol sessiyalar uzilmaydi — **O'zgartirildi: A-032** |
 | A-012 | Profil faqat ko'rish uchun; barcha ma'lumotlarni (telefon ham) admin kiritadi |
 | A-013 | Superadmin kodda emas — CLI buyrug'i bilan yaratiladi |
 | A-014 | Bir kassir bir vaqtda bitta joyda: yangi login eski sessiyani yopadi |
 | A-015 | Bir kassada bir vaqtda bitta kassir; band kassaga boshqa kassir kira olmaydi; admin majburan bo'shatishi mumkin (jurnalga yoziladi) |
 | A-016 | Username: 3–50 belgi, lotin harf, raqam, `_` va `.`; katta-kichik harf farqsiz |
 | A-017 | Parol: 4–64 belgi, katta-kichik harf farqlanadi; berishda "Yangi parol" + "Takrorlang" — mos kelmasa saqlanmaydi |
-| A-018 | Blok vaqtidagi urinishlar hisoblanmaydi va blokni uzaytirmaydi; blok vaqtida to'g'ri parol ham rad etiladi. Xabarlar: "Hisob vaqtincha bloklandi, 10 daqiqadan keyin urinib ko'ring" / "Hisob bloklandi, administratorga murojaat qiling" |
+| A-018 | Blok vaqtidagi urinishlar hisoblanmaydi va blokni uzaytirmaydi; blok vaqtida to'g'ri parol ham rad etiladi. Xabarlar: "Hisob vaqtincha bloklandi, 10 daqiqadan keyin urinib ko'ring" / "Hisob bloklandi, administratorga murojaat qiling" — **O'zgartirildi: A-032** |
 | A-019 | Blokni ochish: past rollarni — admin va superadmin; admin'ni — faqat superadmin; superadmin'ni — faqat server buyrug'i. Har blok va ochish jurnalga |
 | A-020 | "Rollar / Lavozimlar" bo'limi faqat ro'yxat (nom, xodimlar soni, sana), CRUD yo'q (E-007) |
 | A-021 | Sessiya muddati 24 soat tanlandi (12 emas): do'kon ~14 soat ishlaydi, 12 soatda kassir savdo o'rtasida chiqarib yuborilardi |
-| A-022 | Parollar ro'yxatida holat: faol / vaqtincha bloklangan (qachongacha) / doimiy bloklangan + "Blokni ochish" tugmasi |
-| A-023 | Bloklash gibrid: hisoblagichlar va 10 daqiqalik blok — Redis (TTL); doimiy blok — PostgreSQL (`locked_at`), Redis qayta ishga tushsa ham saqlanadi |
-| A-024 | Redis ishlamasa — FAIL-OPEN: himoya vaqtincha o'chadi, login ishlaydi, logga ogohlantirish. Sabab: kassa to'xtab qolmasligi kerak |
-| A-025 | Mavjud bo'lmagan username ham sanaladi va bloklanadi (blok xabaridan username mavjudligini bilib bo'lmasin) |
-| A-026 | Blokdan keyingi "sinov davri" 24 soat eslab qolinadi |
+| A-022 | Parollar ro'yxatida holat: faol / vaqtincha bloklangan (qachongacha) / doimiy bloklangan + "Blokni ochish" tugmasi — **O'zgartirildi: A-032** |
+| A-023 | Bloklash gibrid: hisoblagichlar va 10 daqiqalik blok — Redis (TTL); doimiy blok — PostgreSQL (`locked_at`), Redis qayta ishga tushsa ham saqlanadi — **O'zgartirildi: A-032** |
+| A-024 | Redis ishlamasa — FAIL-OPEN: himoya vaqtincha o'chadi, login ishlaydi, logga ogohlantirish. Sabab: kassa to'xtab qolmasligi kerak — **O'zgartirildi: A-032** |
+| A-025 | Mavjud bo'lmagan username ham sanaladi va bloklanadi (blok xabaridan username mavjudligini bilib bo'lmasin) — **O'zgartirildi: A-032** |
+| A-026 | Blokdan keyingi "sinov davri" 24 soat eslab qolinadi — **O'zgartirildi: A-032** |
 | A-027 | Login nomini admin o'zi yozadi; tizim faqat qoidani (A-016) va unikallikni tekshiradi |
 | A-028 | Arxivdagi xodimga login yaratilmaydi — avval xodim arxivdan qaytariladi |
 | A-029 | O'chirilgan login qaytarilmaydi. Kerak bo'lsa xodimga yangi login yaratiladi — boshqa nom bilan (A-010) |
 | A-030 | Xodim (admin ham) o'z parolini o'zi almashtirmaydi: kassir/omborchi/buxgalternikini admin, adminnikini superadmin almashtiradi |
-| A-031 | "Parollar" ro'yxatida holat: faol / vaqtincha blok (qachongacha, Redis TTL) / doimiy blok / o'chirilgan. "Blokni ochish" ikkalasini ham ochadi va hisoblagichlarni tozalaydi |
+| A-031 | "Parollar" ro'yxatida holat: faol / vaqtincha blok (qachongacha, Redis TTL) / doimiy blok / o'chirilgan. "Blokni ochish" ikkalasini ham ochadi va hisoblagichlarni tozalaydi — **O'zgartirildi: A-032** |
+| A-032 | **Blok soddalashtirildi:** 10 ta **ketma-ket** xato parol → blok (vaqt hisobi yo'q, 10 daqiqalik vaqtincha blok yo'q). Blok o'zi ochilmaydi: past rollarni admin yoki superadmin, admin'ni superadmin, superadmin'ni server buyrug'i ochadi (A-019 o'z kuchida). To'g'ri parol yoki blokni ochish hisoblagichni 0 qiladi. Hisoblagich `user_accounts.failed_attempts` da — **login uchun Redis kerak emas**. Mavjud bo'lmagan username sanalmaydi va bloklanmaydi — har doim "Login yoki parol xato". Blokda to'g'ri parol ham rad etiladi: "Hisob bloklandi, administratorga murojaat qiling". Faol sessiyalar uzilmaydi. "Parollar" ro'yxatida holat: faol / bloklangan / o'chirilgan + `failed_attempts` (admin blokka yaqinlashganini ko'radi). Sabab: tizim soddaroq; admin blokni masofadan ochadi; do'konga begona odam kirmaydi (foydalanuvchi qarori, 24.11.2026) |
 
 ## Xodimlar
 
@@ -115,6 +116,31 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | B-004 | "Katta kassir" vazifasini buxgalter roli bajaradi: kassadagi pulni sanab qabul qiladi, pul avtomatik seyfga o'tadi (alohida rol qo'shilmaydi — R-001) |
 | P-001 | Oylik: ishlangan kunlar, kunlik soat, oylik, bonus, jarima — admin kiritadi |
 
+## Audit jurnali
+
+| # | Qaror |
+|---|---|
+| AU-001 | Jurnalni superadmin va admin ko'radi. Admin superadminning amallarini va superadminga oid yozuvlarni ko'rmaydi (R-003) |
+| AU-002 | Faqat o'zgargan maydonlar yoziladi: `{"maydon": [eski, yangi]}`. Parol, hash va tokenlar hech qachon yozilmaydi — faqat "parol almashtirildi" |
+| AU-003 | Jurnal doimiy saqlanadi, o'chirilmaydi (D-010). Hajm oshsa — oylar bo'yicha partitioning, o'chirish emas |
+| AU-004 | Har bir xato login jurnalga yozilmaydi (faqat structlog). Jurnalga: muvaffaqiyatli login, blok (A-032), blokni ochish. Sabab: A-025 tufayli begona odam jurnalni "spam" bilan to'ldira oladi |
+| AU-005 | 3 ta muhimlik darajasi: info / important / critical. Jurnal standart filtri — important va undan yuqori |
+| AU-006 | Sezgir amallarda sabab majburiy (blokni ochish, kassani majburan bo'shatish, katta chegirma va h.k.). Qaysi amalda majburiyligi katalogda belgilanadi |
+| AU-007 | Oddiy savdo auditga yozilmaydi — chekning o'zi o'zgarmas hujjat. Yoziladi: chegirma, qaytarish, qo'lda narx o'zgartirish |
+| AU-008 | Amallar qat'iy katalogda (`AuditAction`): har amalda nom (`employee.salary_changed`), muhimlik, sabab majburiyligi, o'zbekcha matn shabloni. Umumiy nomlar (`*.updated`) ishlatilmaydi |
+| AU-009 | Yozuv amal bilan bitta tranzaksiyada saqlanadi. Audit yozib bo'lmasa — amal ham bekor (fail-closed; A-024 ning teskarisi, chunki bu nazorat vositasi) |
+| AU-010 | Baza darajasida trigger UPDATE, DELETE va TRUNCATE ni taqiqlaydi. Noto'g'ri yozuv tahrirlanmaydi — ustiga tuzatuvchi yangi yozuv qo'shiladi (storno kabi) |
+| AU-011 | Bitta biznes-amal = bitta yozuv (masalan, 20 qatorli chek uchun 20 ta emas, bitta yozuv) |
+| AU-012 | Har sezgir endpoint uchun test: "amal bajarildi → aynan shu `action` bilan yozuv bor" |
+| AU-013 | Shaxsiy ma'lumotlar (ism, telefon, tug'ilgan sana) jurnalga **to'liq qiymati bilan** yoziladi. E-009 anonimlashtirish xodim kartochkasi va ro'yxatlarga tegishli, jurnalga emas. Ma'lum xavf: "Shaxsga doir ma'lumotlar to'g'risida"gi qonun talabi bilan to'qnashishi mumkin — kerak bo'lsa keyin qiymatlar shifrlanadi |
+| AU-014 | Blokni ochish API'si sababni majburiy qabul qiladi: `POST /accounts/{id}/unlock` `{"reason": "..."}` (AU-006) |
+| AU-015 | Jurnalga yoziladigan joylar: login, blok (A-032, faqat mavjud akkaunt uchun), refresh token o'g'irligi; Parollar (yaratish, parol, blok ochish, o'chirish); Xodimlar (qo'shish, shaxsiy ma'lumot, rasm, lavozim/maosh, arxiv, qaytarish, o'chirish); superadmin CLI. Refresh va logout yozilmaydi. Hech narsa o'zgarmagan takroriy so'rov yozilmaydi |
+| AU-016 | Pul API'ga kirishda doim 2 xonaga keltiriladi (`core/money.py` → `Money`): "4500000" → "4500000.00". Baza, javob va jurnalda bir xil ko'rinish |
+| AU-017 | O'zbekcha matnni (`summary`) **backend** yasaydi va xom ma'lumot (`action`, `changes`) bilan birga qaytaradi. Sabab: tizim bir tilli (ko'p tillilik — "Kerak emas"), mijozlar ko'p bo'lishi mumkin (veb, mobil, Telegram) — qoidalar bitta joyda. Ismlar 2 ta so'rov bilan olinadi (N+1 yo'q) |
+| AU-018 | `GET /audit-logs` — cursor pagination (`limit` ≤ 100, `next_cursor`, `has_more`), eng yangisi tepada. Filtrlar birga (VA) qo'llanadi: sana oralig'i (Toshkent), kim qildi (xodim), bo'lim, amal turlari (bir nechta), muhimlik (standart important+), ob'ekt |
+| AU-019 | Xodim kartochkasidagi "Tarix": xodimning o'ziga va uning login(lar)iga oid barcha yozuvlar, bitta ro'yxatda, muhimlik filtrisiz. Faqat tizimga kirishlar standart yashirin ("Kirishlarni ko'rsatish"). "Amallari" — umumiy jurnal `actor_employee_id` filtri bilan |
+| AU-020 | "Mening sahifam": xodim faqat o'zining lavozim va maosh tarixini ko'radi (`GET /auth/me/positions`, `employee_positions` jadvalidan). Audit jurnalini ko'rmaydi — unda admin ismi, IP va sabablar bor |
+
 ## Muammolar (admin bildirishnomalari)
 
 | # | Qaror |
@@ -124,6 +150,10 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | N-003 | Muammo sababi bartaraf etilganda O'ZI yopiladi (masalan blok ochilganda). Yopilganlar o'chirilmaydi — tarixda: kim, qachon hal qildi |
 | N-004 | Filtrlar: holat (ochiq — standart / hal qilingan / hammasi), tur, sana oralig'i, xodim; eng yangisi tepada; pagination. Har yozuvda tezkor amal tugmasi (masalan "Blokni ochish") |
 | N-005 | Muammo turlari har modulda qo'shib boriladi. Hozirgi ro'yxat: akkaunt bloklandi (auth); 10 000 so'mdan katta chegirma (kassa). Rejada: kamomad, yaroqlilik muddati, qoldiq tugashi, qaytarishlar ko'payishi |
+| N-006 | Muammo turiga qarab yopiladi: sababi texnik bo'lsa (blok) — o'zi yopiladi; odam qarori kerak bo'lsa (katta chegirma) — faqat admin "Asosli / Asossiz" + izoh bilan yopadi. Yopish ham auditga yoziladi — **O'zgartirildi: N-009** |
+| N-007 | *(Kassa'da yakunlanadi)* Katta chegirma: savdo to'xtamaydi, sabab majburiy, keyin admin ko'radi (oldindan PIN-tasdiq emas). Chegara: summa **yoki** foiz (masalan 10 000 so'm yoki 10%), qiymati sozlamada |
+| N-008 | **Muammolar = admin bajarishi kerak bo'lgan ishlar ro'yxati.** 5 qoida: (1) faqat harakat talab qiladigan narsa kiradi — "admin nima qilishi kerak?" savoliga javob bo'lmasa, faqat audit; (2) har muammoda bitta tezkor tugma (`action`, masalan "Blokni ochish"); (3) sabab bartaraf etilsa — o'zi yopiladi; (4) takrorlansa — yangi qator emas, `occurrences` (N-002: `group_key` + qisman unikal indeks + upsert); (5) yopilgan o'chirilmaydi — kim, qachon, qanday yopgani qoladi. Superadminga oid muammoni admin ko'rmaydi. Sahifalash — oddiy (page/size + total) |
+| N-009 | Qo'lda yopish ("Asosli/Asossiz" yoki oddiy "Ko'rib chiqildi" + izoh) — **Kassa bosqichida**, birinchi qo'lda yopiladigan tur (katta chegirma) bilan birga hal qilinadi. Hozir yagona tur — "Akkaunt bloklandi" (A-032): blokda o'zi ochiladi, admin/superadmin (CLI ham) blokni ochganda o'zi yopiladi. Rejadagi turlar: katta chegirma (Kassa), kamomad (Buxgalteriya), qoldiq tugashi va yaroqlilik muddati (Ombor) |
 
 ## Operatsion va nazorat talablari
 
@@ -137,13 +167,14 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 
 Keyinroq ko'rib chiqiladi (hozir rejada emas): kassa ekranini PIN bilan qulflash, faol sessiyalar sahifasi,
 rasmiy hujjatlar (logo, STIR, QR, PDF), versiyalar va CHANGELOG, Excel eksport, Telegram bildirishnomalari,
-dashboard grafiklari.
+dashboard grafiklari, audit jurnali uchun hash zanjiri (o'chirilgan qatorni aniqlash).
 
 ## Kerak emas (ataylab chiqarilgan)
 
 Avtomobil/avtoraqam modullari, operator va programist rollari, fiskal chek, smena moduli,
 sodiqlik ballari, kredit limiti, ko'p tillilik, ulgurji narx, qarzni hisobdan chiqarish,
-qo'lda qoldiq tuzatish, zaxira nusxa UI (zaxira nusxaning o'zi majburiy — O-001), SMS.
+qo'lda qoldiq tuzatish, zaxira nusxa UI (zaxira nusxaning o'zi majburiy — O-001), SMS,
+xodimlarning foizli "intizom ko'rsatkichi" (zaryad/batareya ko'rinishidagi reyting).
 
 ---
 

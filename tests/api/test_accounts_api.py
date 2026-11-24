@@ -72,7 +72,7 @@ async def test_full_flow(api: AsyncClient, db_session: AsyncSession) -> None:
     login = await api.post("/api/v1/auth/login", json={"username": "vali", "password": "boshqa1"})
     assert login.status_code == 200
 
-    unlocked = await api.post(f"{url}/unlock")
+    unlocked = await api.post(f"{url}/unlock", json={"reason": "Tekshirildi"})
     assert unlocked.json()["state"] == "active"
 
     listing = await api.get(ACCOUNTS, params={"search": "vali"})
@@ -86,7 +86,7 @@ async def test_full_flow(api: AsyncClient, db_session: AsyncSession) -> None:
 async def test_unknown_account_is_404(api: AsyncClient, db_session: AsyncSession) -> None:
     await _auth(api, db_session)
 
-    response = await api.post(f"{ACCOUNTS}/999999/unlock")
+    response = await api.post(f"{ACCOUNTS}/999999/unlock", json={"reason": "x"})
 
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "NOT_FOUND"

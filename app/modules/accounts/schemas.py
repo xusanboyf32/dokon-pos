@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.roles import Role
 
@@ -12,14 +12,13 @@ class AccountState(StrEnum):
     """Ro'yxatdagi holat ustuni."""
 
     ACTIVE = "active"
-    TEMPORARILY_LOCKED = "temporarily_locked"  # 10 daqiqalik blok (Redis)
-    LOCKED = "locked"  # doimiy blok — admin ochadi
+    LOCKED = "locked"  # 10 ta ketma-ket xato — admin ochadi (A-032)
     DELETED = "deleted"
 
 
 class AccountStatusFilter(StrEnum):
     ACTIVE = "active"  # o'chirilmaganlar (bloklanganlar ham shu yerda, holati bilan)
-    LOCKED = "locked"  # faqat doimiy bloklanganlar
+    LOCKED = "locked"  # faqat bloklanganlar
     DELETED = "deleted"
 
 
@@ -37,6 +36,20 @@ class PasswordReset(_NewPassword):
     """Yangi parol. Eski parol so'ralmaydi — uni yuqori darajadagi odam beradi (A-017)."""
 
 
+class UnlockRequest(BaseModel):
+    """Blokni ochish sababi majburiy — audit jurnalida saqlanadi (AU-006)."""
+
+    reason: str = Field(min_length=1, max_length=500, examples=["Parolini unutgan, tekshirildi"])
+
+    @field_validator("reason")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Sabab bo'sh bo'lmasligi kerak")
+        return value
+
+
 class AccountOut(BaseModel):
     id: int
     username: str
@@ -45,7 +58,7 @@ class AccountOut(BaseModel):
     role: Role
     role_label: str
     state: AccountState
-    locked_until: datetime | None = Field(description="Vaqtincha blok qachon tugaydi")
+    failed_attempts: int = Field(description="Ketma-ket xato parollar (10 tasida — blok)")
     last_login_at: datetime | None
     created_at: datetime
     deleted_at: datetime | None

@@ -13,7 +13,6 @@ from app.modules.accounts.validation import (
     InvalidUsernameError,
     PasswordMismatchError,
 )
-from app.modules.auth.lockout import LoginGuard
 from app.modules.auth.service import AuthService
 
 
@@ -52,15 +51,15 @@ async def test_password_confirmation_must_match(db_session: AsyncSession) -> Non
         await create_superadmin(db_session, "xusanboy", "1234", "1235")
 
 
-async def test_unlock_superadmin(db_session: AsyncSession, guard: LoginGuard) -> None:
+async def test_unlock_superadmin(db_session: AsyncSession) -> None:
     account = await create_superadmin(db_session, "xusanboy", "1234", "1234")
     account.locked_at = utcnow()
 
-    unlocked = await unlock_superadmin(db_session, guard)
+    unlocked = await unlock_superadmin(db_session)
 
     assert unlocked.locked_at is None
 
 
-async def test_unlock_without_superadmin_fails(db_session: AsyncSession, guard: LoginGuard) -> None:
+async def test_unlock_without_superadmin_fails(db_session: AsyncSession) -> None:
     with pytest.raises(NotFoundError):
-        await unlock_superadmin(db_session, guard)
+        await unlock_superadmin(db_session)
