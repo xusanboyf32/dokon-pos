@@ -15,9 +15,7 @@ from typing import Any
 
 from app.core.database import SessionFactory, engine
 from app.core.exceptions import AppError
-from app.core.redis import close_redis, get_redis
 from app.modules.accounts.superadmin import create_superadmin, unlock_superadmin
-from app.modules.auth.lockout import LoginGuard
 
 
 async def _create_superadmin(username: str, password: str, confirmation: str) -> None:
@@ -28,7 +26,7 @@ async def _create_superadmin(username: str, password: str, confirmation: str) ->
 
 async def _unlock_superadmin() -> None:
     async with SessionFactory() as session:
-        account = await unlock_superadmin(session, LoginGuard(get_redis()))
+        account = await unlock_superadmin(session)
     print(f"✅ Superadmin blokdan chiqarildi: {account.username}")
 
 
@@ -37,7 +35,6 @@ async def _run(command: Coroutine[Any, Any, None]) -> None:
         await command
     finally:
         await engine.dispose()
-        await close_redis()
 
 
 def main(argv: list[str] | None = None) -> int:

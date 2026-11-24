@@ -12,14 +12,13 @@ class AccountState(StrEnum):
     """Ro'yxatdagi holat ustuni."""
 
     ACTIVE = "active"
-    TEMPORARILY_LOCKED = "temporarily_locked"  # 10 daqiqalik blok (Redis)
-    LOCKED = "locked"  # doimiy blok — admin ochadi
+    LOCKED = "locked"  # 10 ta ketma-ket xato — admin ochadi (A-032)
     DELETED = "deleted"
 
 
 class AccountStatusFilter(StrEnum):
     ACTIVE = "active"  # o'chirilmaganlar (bloklanganlar ham shu yerda, holati bilan)
-    LOCKED = "locked"  # faqat doimiy bloklanganlar
+    LOCKED = "locked"  # faqat bloklanganlar
     DELETED = "deleted"
 
 
@@ -59,7 +58,7 @@ class AccountOut(BaseModel):
     role: Role
     role_label: str
     state: AccountState
-    locked_until: datetime | None = Field(description="Vaqtincha blok qachon tugaydi")
+    failed_attempts: int = Field(description="Ketma-ket xato parollar (10 tasida — blok)")
     last_login_at: datetime | None
     created_at: datetime
     deleted_at: datetime | None

@@ -9,7 +9,7 @@ ombor, buxgalteriya (kassadan pul qabul qilish), qarzlar, ta'minotchilar, xodiml
 |---|---|
 | Backend | Python 3.11+, FastAPI, SQLAlchemy 2.0 (async) + asyncpg, Pydantic v2 |
 | Ma'lumotlar bazasi | PostgreSQL 15+, Alembic (migratsiyalar) |
-| Kesh / navbat | **Redis 7+** (`EXPIRE ... NX` buyrug'i kerak; Windows'da — WSL Ubuntu ichida), Celery |
+| Kesh / navbat | Redis 7+ va Celery — 11-bosqichdan (hozir ishlatilmaydi; login himoyasi bazada, A-032) |
 | Frontend | React + TypeScript (rasmiy dizayn tizimi bilan) |
 | Sifat | pytest, ruff, mypy, GitHub Actions |
 | Paket boshqaruvi | uv + pyproject.toml |

@@ -1,13 +1,12 @@
 """Auth biznes-mantig'i: login, refresh, logout, joriy foydalanuvchi.
 
 Oqimlar docs/modules/auth.md, 4-bo'limda. Har bir ochiq metod — bitta tranzaksiya.
-Kirishga urinishdan himoya — LoginGuard (lockout.py).
+Kirishga urinishdan himoya: 10 ta ketma-ket xato → blok, hisoblagich bazada (A-032).
 """
 
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import NoReturn
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,13 +29,11 @@ from app.modules.audit.catalog import AuditAction
 from app.modules.auth import repository as repo
 from app.modules.auth.exceptions import (
     AccountLockedError,
-    AccountTemporarilyLockedError,
     InvalidCredentialsError,
     RefreshTokenReusedError,
     SessionExpiredError,
     SessionInvalidError,
 )
-from app.modules.auth.lockout import LockDecision, LoginGuard
 from app.modules.auth.models import AuthSession, RevokeReason
 
 log = structlog.get_logger()
@@ -79,10 +76,13 @@ def _can_sign_in(account: UserAccount) -> bool:
     return account.employee is None or account.employee.archived_at is None
 
 
+# A-032: shuncha ketma-ket xato parol — akkaunt bloklanadi, faqat admin/superadmin ochadi
+MAX_FAILED_ATTEMPTS = 10
+
+
 class AuthService:
-    def __init__(self, session: AsyncSession, guard: LoginGuard) -> None:
+    def __init__(self, session: AsyncSession) -> None:
         self._session = session
-        self._guard = guard
 
     # ------------------------------------------------------------------ login
     async def login(
@@ -91,37 +91,22 @@ class AuthService:
         username = username.strip().lower()
         account = await repo.get_account_by_username(self._session, username)
 
-        # 1. Doimiy blok — to'g'ri parol ham qabul qilinmaydi (7a, 7d)
+        # 1. Bloklangan — to'g'ri parol ham qabul qilinmaydi (A-032)
         if account is not None and account.locked_at is not None:
             verify_password_against_dummy(password)  # javob vaqti bir xil bo'lsin
             raise AccountLockedError()
 
-        # 2. Vaqtincha blok va tezlik chegarasi (Redis).
-        #    Mavjud bo'lmagan username ham sanaladi — aks holda blok xabaridan
-        #    qaysi username mavjudligini bilib olish mumkin bo'lardi.
-        attempt = await self._guard.on_attempt(username)
-        if attempt.locked_seconds_left is not None:
-            verify_password_against_dummy(password)
-            raise AccountTemporarilyLockedError(attempt.locked_seconds_left)
-        if attempt.decision is not LockDecision.NONE:
-            verify_password_against_dummy(password)
-            await self._apply_lock(attempt.decision, account, username, ip)
-
-        # 3. Parol
+        # 2. Parol. Akkaunt topilmasa ham soxta hash tekshiriladi — javob vaqtidan
+        #    qaysi username mavjudligini bilib bo'lmasin.
         if account is None or not _can_sign_in(account):
             verify_password_against_dummy(password)
-            valid = False
-        else:
-            valid = verify_password(password, account.password_hash)
-        if not valid:
-            decision = await self._guard.on_failure(username)
-            if decision is not LockDecision.NONE:
-                await self._apply_lock(decision, account, username, ip)
             raise InvalidCredentialsError()
-        assert account is not None
+        if not verify_password(password, account.password_hash):
+            await self._register_failure(account, username, ip)
+            raise InvalidCredentialsError()
 
-        # 4. Muvaffaqiyat — hisoblagichlar 0 (7c)
-        await self._guard.on_success(username)
+        # 3. Muvaffaqiyat — hisoblagich 0
+        account.failed_attempts = 0
         now = utcnow()
         role = resolve_role(account)
         if role in SINGLE_SESSION_ROLES:
@@ -151,42 +136,29 @@ class AuthService:
 
         return self._token_pair(account, auth_session, refresh_token, role)
 
-    async def _apply_lock(
-        self,
-        decision: LockDecision,
-        account: UserAccount | None,
-        username: str,
-        ip: str | None,
-    ) -> NoReturn:
-        """Blok qarorini bajaradi va mos xatoni ko'taradi.
+    async def _register_failure(self, account: UserAccount, username: str, ip: str | None) -> None:
+        """Xato parol: hisoblagich +1; chegaraga yetsa — blok, jurnal va xato (A-032).
 
-        Faol sessiyalar TO'XTATILMAYDI — blok faqat yangi kirishga tegadi (7g).
+        Har bir xato urinish jurnalga yozilmaydi — faqat logga (AU-004). Jurnalga faqat blok.
+        Faol sessiyalar TO'XTATILMAYDI — blok faqat yangi kirishga tegadi.
         """
-        if decision is LockDecision.PERMANENT and account is not None:
-            account.locked_at = utcnow()
-            await self._record_lock(AuditAction.AUTH_LOCKED_PERMANENT, account)
+        failures = await repo.register_failed_attempt(self._session, account.id)
+        if failures < MAX_FAILED_ATTEMPTS:
             await self._session.commit()
-            log.warning("account_locked_permanently", username=username, ip=ip)
-            raise AccountLockedError()
+            log.info("login_failed", username=username, ip=ip, failures=failures)
+            return
 
-        if decision is LockDecision.PERMANENT:  # bunday username yo'q — yana vaqtincha
-            await self._guard.lock_temporarily(username)
-        if account is not None:
-            # Mavjud bo'lmagan username faqat logga yoziladi: jurnalda unga mos akkaunt yo'q
-            await self._record_lock(AuditAction.AUTH_LOCKED_TEMPORARY, account)
-            await self._session.commit()
-        log.warning("account_locked_temporarily", username=username, ip=ip)
-        raise AccountTemporarilyLockedError(self._guard.lock_seconds)
-
-    async def _record_lock(self, action: AuditAction, account: UserAccount) -> None:
-        """Blokni "Tizim" qo'yadi — aktyor yo'q (AU-004)."""
+        account.locked_at = utcnow()
         await audit.record(
             self._session,
-            actor=None,
-            action=action,
+            actor=None,  # "Tizim"
+            action=AuditAction.AUTH_LOCKED_PERMANENT,
             entity=("account", account.id),
             concerns_superadmin=account.is_superadmin,
         )
+        await self._session.commit()
+        log.warning("account_locked", username=username, ip=ip)
+        raise AccountLockedError()
 
     # ------------------------------------------------------------------ refresh
     async def refresh(

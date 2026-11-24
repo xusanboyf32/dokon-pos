@@ -33,7 +33,8 @@ class Settings(BaseSettings):
     # Osilib qolgan so'rov shuncha millisekunddan keyin to'xtatiladi
     db_statement_timeout_ms: int = 5000
 
-    # Redis: login hisoblagichlari (keyinroq Celery). Testlar alohida baza raqamida (/15).
+    # Redis: hozir ishlatilmaydi — login himoyasi bazaga ko'chdi (A-032).
+    # 11-bosqichda Celery navbati uchun kerak bo'ladi.
     redis_url: RedisDsn = RedisDsn("redis://localhost:6379/0")
     test_redis_url: RedisDsn | None = None
 

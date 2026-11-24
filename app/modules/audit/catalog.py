@@ -22,8 +22,10 @@ class Severity(StrEnum):
 class AuditAction(StrEnum):
     # auth — kirish va bloklar (AU-004: har bir xato urinish yozilmaydi)
     AUTH_LOGIN_SUCCESS = "auth.login_success"
+    # Eski ikki bosqichli tizimdan (A-032 gacha). Yangi yozuv yozilmaydi, lekin jurnaldagi
+    # eski yozuvlar o'qilishi uchun katalogda qoladi — o'chirilmaydi.
     AUTH_LOCKED_TEMPORARY = "auth.locked_temporary"
-    AUTH_LOCKED_PERMANENT = "auth.locked_permanent"
+    AUTH_LOCKED_PERMANENT = "auth.locked_permanent"  # 10 ta ketma-ket xato (A-032)
     AUTH_TOKEN_REUSE_DETECTED = "auth.token_reuse_detected"
 
     # account — "Parollar" bo'limi
@@ -56,8 +58,8 @@ _I, _M, _C = Severity.INFO, Severity.IMPORTANT, Severity.CRITICAL
 
 CATALOG: dict[AuditAction, ActionSpec] = {
     AuditAction.AUTH_LOGIN_SUCCESS: ActionSpec(_I, "Tizimga kirdi"),
-    AuditAction.AUTH_LOCKED_TEMPORARY: ActionSpec(_M, "Hisob vaqtincha bloklandi"),
-    AuditAction.AUTH_LOCKED_PERMANENT: ActionSpec(_C, "Hisob doimiy bloklandi"),
+    AuditAction.AUTH_LOCKED_TEMPORARY: ActionSpec(_M, "Hisob vaqtincha bloklandi (eski tizim)"),
+    AuditAction.AUTH_LOCKED_PERMANENT: ActionSpec(_C, "Hisob bloklandi"),
     AuditAction.AUTH_TOKEN_REUSE_DETECTED: ActionSpec(_C, "Token qayta ishlatildi (o'g'irlik)"),
     AuditAction.ACCOUNT_CREATED: ActionSpec(_M, "Login yaratildi"),
     AuditAction.ACCOUNT_PASSWORD_RESET: ActionSpec(_M, "Parol almashtirildi"),

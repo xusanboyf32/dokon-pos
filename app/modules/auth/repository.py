@@ -71,3 +71,18 @@ async def revoke_active_sessions_of_family(
         .values(revoked_at=now, revoked_reason=reason)
     )
     await session.execute(stmt)
+
+
+async def register_failed_attempt(session: AsyncSession, account_id: int) -> int:
+    """Xato parol: hisoblagich +1 va yangi qiymat (A-032).
+
+    Python'da "o'qi → +1 → yoz" emas, bitta SQL: ikki xato urinish bir vaqtda kelsa ham
+    ikkalasi sanaladi (aks holda ikkalasi 4 ni o'qib, ikkalasi 5 deb yozardi).
+    """
+    stmt = (
+        update(UserAccount)
+        .where(UserAccount.id == account_id)
+        .values(failed_attempts=UserAccount.failed_attempts + 1)
+        .returning(UserAccount.failed_attempts)
+    )
+    return int((await session.execute(stmt)).scalar_one())

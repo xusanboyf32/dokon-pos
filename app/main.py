@@ -19,7 +19,6 @@ from app.core.database import engine, get_session
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import request_context_middleware
-from app.core.redis import close_redis
 from app.modules.accounts.router import router as accounts_router
 from app.modules.audit.router import history_router as audit_history_router
 from app.modules.audit.router import router as audit_router
@@ -34,7 +33,6 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     yield
     # Ilova to'xtaganda barcha ulanishlar toza yopiladi
     await engine.dispose()
-    await close_redis()
 
 
 def create_app() -> FastAPI:

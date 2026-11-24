@@ -9,7 +9,6 @@ from app.modules.accounts.models import UserAccount
 from app.modules.accounts.validation import normalize_username, validate_new_password
 from app.modules.audit import service as audit
 from app.modules.audit.catalog import AuditAction
-from app.modules.auth.lockout import LoginGuard
 
 
 async def _get_superadmin(session: AsyncSession) -> UserAccount | None:
@@ -42,14 +41,14 @@ async def create_superadmin(
     return account
 
 
-async def unlock_superadmin(session: AsyncSession, guard: LoginGuard) -> UserAccount:
+async def unlock_superadmin(session: AsyncSession) -> UserAccount:
     account = await _get_superadmin(session)
     if account is None:
         raise NotFoundError("Superadmin topilmadi")
     account.locked_at = None
+    account.failed_attempts = 0
     await _record(session, AuditAction.ACCOUNT_SUPERADMIN_UNLOCKED, account)
     await session.commit()
-    await guard.reset(account.username)  # hamma hisoblagich 0 (7e)
     return account
 
 

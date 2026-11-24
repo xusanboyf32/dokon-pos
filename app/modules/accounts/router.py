@@ -17,8 +17,7 @@ from app.modules.accounts.schemas import (
     UnlockRequest,
 )
 from app.modules.accounts.service import AccountService
-from app.modules.auth.dependencies import get_login_guard, require_roles
-from app.modules.auth.lockout import LoginGuard
+from app.modules.auth.dependencies import require_roles
 from app.modules.auth.service import CurrentUser
 
 router = APIRouter(prefix="/accounts", tags=["Parollar"])
@@ -29,9 +28,8 @@ _admin = require_roles(Role.ADMIN)
 def get_service(
     session: AsyncSession = Depends(get_session),
     actor: CurrentUser = Depends(_admin),
-    guard: LoginGuard = Depends(get_login_guard),
 ) -> AccountService:
-    return AccountService(session, actor, guard)
+    return AccountService(session, actor)
 
 
 Service = Annotated[AccountService, Depends(get_service)]

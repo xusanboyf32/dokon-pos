@@ -33,9 +33,9 @@ Pul summalari **string** sifatida qaytariladi (`"37000.00"`) — JSON number'dag
 ```json
 {
   "error": {
-    "code": "ACCOUNT_LOCKED",
-    "message": "Akkaunt 10 daqiqaga bloklangan",
-    "details": { "locked_until": "2026-11-23T08:40:00Z" },
+    "code": "REASON_REQUIRED",
+    "message": "Bu amal uchun sabab ko'rsatilishi shart",
+    "details": { "field": "reason" },
     "request_id": "7f3c2a..."
   }
 }

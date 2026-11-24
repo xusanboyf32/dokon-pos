@@ -54,8 +54,8 @@ Partial unique index: xodimda `valid_to IS NULL` davr bittadan ko'p bo'lmaydi.
 | username | varchar(50), unique | doim kichik harfda; qayta ishlatilmaydi (o'chirilgan akkaunt ham username'ni band qilib turadi) |
 | password_hash | varchar | argon2 |
 | token_version | integer, default 0 | parol/rol o'zgarsa +1 |
-| failed_attempts_after_lock | smallint | 10 daqiqalik blokdan keyingi xatolar |
-| is_locked | boolean | doimiy blok |
+| failed_attempts | smallint, default 0, CHECK ≥ 0 | ketma-ket xato parollar (A-032) |
+| locked_at | timestamptz, null | blok qo'yilgan vaqt; null — bloklanmagan |
 | last_login_at | timestamptz, null | |
 | created_at, updated_at, deleted_at | timestamptz | |
 
@@ -91,11 +91,11 @@ Partial unique index: xodimda `valid_to IS NULL` davr bittadan ko'p bo'lmaydi.
 | GET | /api/v1/employees/{id}/positions | superadmin, admin | lavozim va maosh tarixi |
 | GET | /api/v1/employees/{id}/history | superadmin, admin | "Tarix" tabi: xodim va uning loginiga oid audit yozuvlari, cursor; `include_logins` (AU-019) |
 | POST | /api/v1/employees/{id}/archive, /restore | superadmin, admin | arxivlash / qaytarish (E-005) |
-| GET | /api/v1/accounts | superadmin, admin | ro'yxat: `status` (active/locked/deleted), `search` (username yoki ism), `role`, `created_from/to`, `page`, `size`; har qatorda `state` va `locked_until` (A-031) |
+| GET | /api/v1/accounts | superadmin, admin | ro'yxat: `status` (active/locked/deleted), `search` (username yoki ism), `role`, `created_from/to`, `page`, `size`; har qatorda `state` va `failed_attempts` (A-032) |
 | POST | /api/v1/accounts | superadmin, admin | login yaratish: `employee_id`, `username`, `password`, `password_confirm` (A-027, A-028) |
 | GET | /api/v1/accounts/{id} | superadmin, admin | login kartochkasi |
 | POST | /api/v1/accounts/{id}/reset-password | superadmin, admin | yangi parol + tasdiqlash; barcha sessiyalar yopiladi |
-| POST | /api/v1/accounts/{id}/unlock | superadmin, admin | doimiy va vaqtincha blokni ochish; `reason` majburiy (AU-014) |
+| POST | /api/v1/accounts/{id}/unlock | superadmin, admin | blokni ochish va hisoblagichni 0 qilish; `reason` majburiy (AU-014) |
 | DELETE | /api/v1/accounts/{id} | superadmin, admin | loginni o'chirish (qaytarilmaydi, A-029; xodim va tarix qoladi) |
 
 Admin uchun barcha endpoint'larda: superadmin ko'rinmaydi va o'zgartirilmaydi; admin akkauntlari o'zgartirilmaydi.
@@ -104,13 +104,13 @@ Admin uchun barcha endpoint'larda: superadmin ko'rinmaydi va o'zgartirilmaydi; a
 
 ### Login
 1. Username kichik harfga o'tkaziladi.
-2. Akkaunt doimiy bloklangan → 423.
-3. Redis'da vaqtinchalik blok bor → 423 (`locked_until` bilan).
-4. Parol tekshiriladi (akkaunt topilmasa ham soxta hash tekshiriladi — vaqt bo'yicha username aniqlanmasligi uchun).
-5. Xato → Redis hisoblagichlari oshadi; chegaradan oshsa blok qo'yiladi → 401.
-6. To'g'ri → hisoblagichlar tozalanadi; kassir bo'lsa eski sessiyalari yopiladi (A-014);
+2. Akkaunt bloklangan → 423 (to'g'ri parol ham rad etiladi).
+3. Parol tekshiriladi (akkaunt topilmasa ham soxta hash tekshiriladi — vaqt bo'yicha username aniqlanmasligi uchun).
+4. Xato → `failed_attempts` +1 (bitta atomar SQL). 10-chisida → `locked_at`, audit, 423; aks holda 401.
+   Mavjud bo'lmagan username sanalmaydi.
+5. To'g'ri → `failed_attempts = 0`; kassir bo'lsa eski sessiyalari yopiladi (A-014);
    yangi sessiya; access token (15 daq) + refresh cookie (24 soat) + rol qaytadi.
-7. Audit: `auth.login_success` / `auth.locked_temporary` / `auth.locked_permanent`. Har bir xato urinish faqat structlog'ga yoziladi (AU-004).
+6. Audit: `auth.login_success` / `auth.locked_permanent`. Har bir xato urinish faqat structlog'ga yoziladi (AU-004).
 
 ### Har so'rov
 Access token tekshiriladi → akkaunt mavjud, o'chirilmagan, bloklanmagan → xodim faol →
@@ -131,22 +131,18 @@ Cookie'dagi token hash bo'yicha topiladi →
 | Xodimni arxivlash | barcha sessiyalar yopiladi, login ishlamaydi; qaytarilsa — ishlaydi |
 | Akkauntni o'chirish | sessiyalar yopiladi; xodim va tarix qoladi |
 | Xodimni o'chirish | tarixi yo'q → butunlay; bor → anonimlashtiriladi, akkauntlar o'chiriladi, tarix qoladi (E-009) |
-| Blokni ochish | is_locked=false, hisoblagichlar tozalanadi, audit |
+| Blokni ochish | `locked_at = null`, `failed_attempts = 0`, sabab majburiy, audit |
 
-## 5. Lockout (Redis)
+## 5. Blok (A-032)
 
-| Kalit | TTL | Ma'nosi |
-|---|---|---|
-| `auth:fail:{username}` | — (muvaffaqiyatda tozalanadi) | ketma-ket xatolar |
-| `auth:rate:{username}` | 60 s | oxirgi daqiqadagi urinishlar |
-| `auth:lock:{username}` | 600 s | vaqtinchalik blok |
-
-5 ketma-ket xato yoki daqiqada 5+ urinish → `auth:lock` (10 daq). Blokdan keyin yana 3 xato →
-bazada `is_locked = true` (doimiy). Superadmin doimiy blokini faqat `python -m app.cli unlock-superadmin` ochadi.
+10 ta **ketma-ket** xato parol → `locked_at` qo'yiladi. Vaqt hisobi va vaqtincha blok yo'q —
+blokni faqat admin/superadmin ochadi (A-019). To'g'ri parol hisoblagichni 0 qiladi.
+Hisoblagich bazada (`user_accounts.failed_attempts`) — Redis ishlatilmaydi.
+Superadmin blokini faqat `python -m app.cli unlock-superadmin` ochadi.
 
 ## 6. Testlar (minimal ro'yxat)
 - To'g'ri/xato login; username katta-kichik harf.
-- 5 xato → 423; 10 daqiqadan keyin ochiladi; yana 3 xato → doimiy blok.
+- 9 xato → hali kira oladi; 10-chisi → 423; blokda to'g'ri parol ham 423; to'g'ri parol hisoblagichni 0 qiladi.
 - Refresh rotation; eski refresh qayta ishlatilsa barcha sessiyalar yopiladi.
 - Refresh 24 soatdan keyin ishlamaydi, rotation muddatni uzaytirmaydi.
 - Parol o'zgargach eski access token 401.

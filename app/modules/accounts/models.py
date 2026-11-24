@@ -18,6 +18,7 @@ from sqlalchemy import (
     Identity,
     Index,
     Integer,
+    SmallInteger,
     String,
     false,
     text,
@@ -48,7 +49,9 @@ class UserAccount(Base, TimestampMixin):
     # Parol yoki lavozim o'zgarsa +1 → eski tokenlar yaroqsiz bo'ladi (A-007)
     token_version: Mapped[int] = mapped_column(Integer, server_default=text("0"))
 
-    # Doimiy blok (A-011). Vaqtinchalik 10 daqiqalik blok Redis'da turadi.
+    # Ketma-ket xato parollar soni. To'g'ri kirilsa yoki blok ochilsa — 0 (A-032)
+    failed_attempts: Mapped[int] = mapped_column(SmallInteger, server_default=text("0"))
+    # Blok (A-032): 10 ta ketma-ket xatodan keyin. Faqat admin/superadmin ochadi
     locked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # "Parol o'chirildi" — xodim qoladi, lekin kira olmaydi (spetsifikatsiya, 24-band)
@@ -66,6 +69,7 @@ class UserAccount(Base, TimestampMixin):
         ),
         CheckConstraint(f"username ~ '{USERNAME_PATTERN}'", name="username_format"),
         CheckConstraint("token_version >= 0", name="token_version_not_negative"),
+        CheckConstraint("failed_attempts >= 0", name="failed_attempts_not_negative"),
         # Superadmin butun tizimda faqat bitta (R-003)
         Index(
             "uq_user_accounts_single_superadmin",

@@ -9,7 +9,7 @@
    ▼
  FastAPI (modular monolith)
    ├── PostgreSQL  — asosiy ma'lumotlar (yagona haqiqat manbai)
-   ├── Redis       — lockout/rate-limit hisoblagichlari, Celery broker
+   ├── Redis       — Celery broker (11-bosqich); login himoyasi bazada (A-032)
    └── Celery      — fon vazifalari (hisobotlar, PDF, yaroqlilik ogohlantirishi)
 ```
 
@@ -27,7 +27,6 @@ dokon-pos/
 │   │   ├── config.py           Settings (pydantic-settings, .env)
 │   │   ├── database.py         async engine, session, Base, tranzaksiya yordamchilari
 │   │   ├── security.py         parol hash (argon2), JWT
-│   │   ├── redis.py            Redis ulanishi
 │   │   ├── time.py             utcnow(), Toshkent vaqt zonasi
 │   │   ├── money.py            Decimal yordamchilari, yaxlitlash
 │   │   ├── exceptions.py       AppError ierarxiyasi + global handler
@@ -35,7 +34,7 @@ dokon-pos/
 │   │   ├── logging.py          structlog sozlamasi, request_id
 │   │   └── permissions.py      Role → Permission xaritasi
 │   ├── modules/
-│   │   ├── auth/               login, refresh, logout, sessiyalar, lockout
+│   │   ├── auth/               login, refresh, logout, sessiyalar, blok (A-032)
 │   │   ├── employees/          xodimlar, lavozim berish
 │   │   ├── accounts/           parollar (user_accounts)
 │   │   ├── audit/              audit jurnali
