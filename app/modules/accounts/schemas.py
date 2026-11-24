@@ -3,7 +3,7 @@
 from datetime import datetime
 from enum import StrEnum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.core.roles import Role
 
@@ -35,6 +35,20 @@ class AccountCreate(_NewPassword):
 
 class PasswordReset(_NewPassword):
     """Yangi parol. Eski parol so'ralmaydi — uni yuqori darajadagi odam beradi (A-017)."""
+
+
+class UnlockRequest(BaseModel):
+    """Blokni ochish sababi majburiy — audit jurnalida saqlanadi (AU-006)."""
+
+    reason: str = Field(min_length=1, max_length=500, examples=["Parolini unutgan, tekshirildi"])
+
+    @field_validator("reason")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Sabab bo'sh bo'lmasligi kerak")
+        return value
 
 
 class AccountOut(BaseModel):

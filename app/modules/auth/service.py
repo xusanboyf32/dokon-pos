@@ -25,6 +25,8 @@ from app.core.security import (
 )
 from app.core.time import utcnow
 from app.modules.accounts.models import UserAccount
+from app.modules.audit import service as audit
+from app.modules.audit.catalog import AuditAction
 from app.modules.auth import repository as repo
 from app.modules.auth.exceptions import (
     AccountLockedError,
@@ -139,6 +141,12 @@ class AuthService:
         )
         repo.add_session(self._session, auth_session)
         account.last_login_at = now
+        await audit.record(
+            self._session,
+            actor=audit.ActorRef(account.id, role),
+            action=AuditAction.AUTH_LOGIN_SUCCESS,
+            entity=("account", account.id),
+        )
         await self._session.commit()
 
         return self._token_pair(account, auth_session, refresh_token, role)
@@ -156,15 +164,29 @@ class AuthService:
         """
         if decision is LockDecision.PERMANENT and account is not None:
             account.locked_at = utcnow()
+            await self._record_lock(AuditAction.AUTH_LOCKED_PERMANENT, account)
             await self._session.commit()
-            # TODO(audit): 3-bosqichda audit jurnaliga ham yoziladi (7f)
             log.warning("account_locked_permanently", username=username, ip=ip)
             raise AccountLockedError()
 
         if decision is LockDecision.PERMANENT:  # bunday username yo'q — yana vaqtincha
             await self._guard.lock_temporarily(username)
+        if account is not None:
+            # Mavjud bo'lmagan username faqat logga yoziladi: jurnalda unga mos akkaunt yo'q
+            await self._record_lock(AuditAction.AUTH_LOCKED_TEMPORARY, account)
+            await self._session.commit()
         log.warning("account_locked_temporarily", username=username, ip=ip)
         raise AccountTemporarilyLockedError(self._guard.lock_seconds)
+
+    async def _record_lock(self, action: AuditAction, account: UserAccount) -> None:
+        """Blokni "Tizim" qo'yadi — aktyor yo'q (AU-004)."""
+        await audit.record(
+            self._session,
+            actor=None,
+            action=action,
+            entity=("account", account.id),
+            concerns_superadmin=account.is_superadmin,
+        )
 
     # ------------------------------------------------------------------ refresh
     async def refresh(
@@ -183,6 +205,14 @@ class AuthService:
                 # Butun oila yopiladi: o'g'ri ham, egasi ham chiqariladi (A-006).
                 await repo.revoke_active_sessions_of_family(
                     self._session, old.family_id, RevokeReason.REUSE_DETECTED, now
+                )
+                victim = await repo.get_account_by_id(self._session, old.account_id)
+                await audit.record(
+                    self._session,
+                    actor=None,
+                    action=AuditAction.AUTH_TOKEN_REUSE_DETECTED,
+                    entity=("account", old.account_id),
+                    concerns_superadmin=victim is not None and victim.is_superadmin,
                 )
                 await self._session.commit()
                 raise RefreshTokenReusedError()

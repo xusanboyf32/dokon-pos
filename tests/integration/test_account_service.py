@@ -42,18 +42,18 @@ PAGE = PageParams(page=1, size=20)
 NEW = "yangi123"
 
 
-def actor(role: Role) -> CurrentUser:
-    return CurrentUser(account_id=0, session_id=uuid.uuid4(), role=role, employee_id=None)
+def actor(role: Role, account_id: int) -> CurrentUser:
+    return CurrentUser(account_id=account_id, session_id=uuid.uuid4(), role=role, employee_id=None)
 
 
 @pytest.fixture
-def admin(db_session: AsyncSession, guard: LoginGuard) -> AccountService:
-    return AccountService(db_session, actor(Role.ADMIN), guard)
+def admin(db_session: AsyncSession, guard: LoginGuard, actor_account_id: int) -> AccountService:
+    return AccountService(db_session, actor(Role.ADMIN, actor_account_id), guard)
 
 
 @pytest.fixture
-def boss(db_session: AsyncSession, guard: LoginGuard) -> AccountService:
-    return AccountService(db_session, actor(Role.SUPERADMIN), guard)
+def boss(db_session: AsyncSession, guard: LoginGuard, actor_account_id: int) -> AccountService:
+    return AccountService(db_session, actor(Role.SUPERADMIN, actor_account_id), guard)
 
 
 async def add_employee(
@@ -217,11 +217,13 @@ async def test_list_search_and_role_filter(db_session: AsyncSession, admin: Acco
     assert [a.username for a in kassirs.items] == ["anvar"]
 
 
-async def test_list_survives_redis_outage(db_session: AsyncSession) -> None:
+async def test_list_survives_redis_outage(db_session: AsyncSession, actor_account_id: int) -> None:
     await create_user(db_session)
     dead_redis = Redis.from_url("redis://localhost:1/0", socket_connect_timeout=0.2)
     try:
-        service = AccountService(db_session, actor(Role.ADMIN), LoginGuard(dead_redis))
+        service = AccountService(
+            db_session, actor(Role.ADMIN, actor_account_id), LoginGuard(dead_redis)
+        )
         page = await service.search(PAGE)
     finally:
         await dead_redis.aclose()
@@ -296,7 +298,7 @@ async def test_unlock_permanent_and_temporary_lock(
     with pytest.raises(AccountLockedError):
         await service.login("anvar", PASSWORD, **CLIENT)
 
-    out = await admin.unlock(account.id)
+    out = await admin.unlock(account.id, reason="Tekshirildi")
 
     assert out.state is AccountState.ACTIVE
     assert await guard.locked_seconds_left(["anvar"]) == {}
@@ -311,9 +313,9 @@ async def test_admin_cannot_unlock_admin(
     await db_session.flush()
 
     with pytest.raises(ForbiddenError):
-        await admin.unlock(other_admin.id)
+        await admin.unlock(other_admin.id, reason="Tekshirildi")
 
-    assert (await boss.unlock(other_admin.id)).state is AccountState.ACTIVE
+    assert (await boss.unlock(other_admin.id, reason="Tekshirildi")).state is AccountState.ACTIVE
 
 
 # ================================================================== o'chirish

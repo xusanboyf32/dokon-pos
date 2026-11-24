@@ -131,6 +131,10 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | AU-010 | Baza darajasida trigger UPDATE, DELETE va TRUNCATE ni taqiqlaydi. Noto'g'ri yozuv tahrirlanmaydi — ustiga tuzatuvchi yangi yozuv qo'shiladi (storno kabi) |
 | AU-011 | Bitta biznes-amal = bitta yozuv (masalan, 20 qatorli chek uchun 20 ta emas, bitta yozuv) |
 | AU-012 | Har sezgir endpoint uchun test: "amal bajarildi → aynan shu `action` bilan yozuv bor" |
+| AU-013 | Shaxsiy ma'lumotlar (ism, telefon, tug'ilgan sana) jurnalga **to'liq qiymati bilan** yoziladi. E-009 anonimlashtirish xodim kartochkasi va ro'yxatlarga tegishli, jurnalga emas. Ma'lum xavf: "Shaxsga doir ma'lumotlar to'g'risida"gi qonun talabi bilan to'qnashishi mumkin — kerak bo'lsa keyin qiymatlar shifrlanadi |
+| AU-014 | Blokni ochish API'si sababni majburiy qabul qiladi: `POST /accounts/{id}/unlock` `{"reason": "..."}` (AU-006) |
+| AU-015 | Jurnalga yoziladigan joylar: login, vaqtincha/doimiy blok (faqat mavjud akkaunt uchun), refresh token o'g'irligi; Parollar (yaratish, parol, blok ochish, o'chirish); Xodimlar (qo'shish, shaxsiy ma'lumot, rasm, lavozim/maosh, arxiv, qaytarish, o'chirish); superadmin CLI. Refresh va logout yozilmaydi. Hech narsa o'zgarmagan takroriy so'rov yozilmaydi |
+| AU-016 | Pul API'ga kirishda doim 2 xonaga keltiriladi (`core/money.py` → `Money`): "4500000" → "4500000.00". Baza, javob va jurnalda bir xil ko'rinish |
 
 ## Muammolar (admin bildirishnomalari)
 

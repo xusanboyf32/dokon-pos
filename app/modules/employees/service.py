@@ -13,6 +13,8 @@ from app.core.exceptions import AppError, ConflictError, ForbiddenError, NotFoun
 from app.core.pagination import Page, PageParams
 from app.core.roles import EMPLOYEE_ROLES, ROLE_LABELS, Role, can_manage
 from app.core.time import to_tashkent, utcnow
+from app.modules.audit import service as audit
+from app.modules.audit.catalog import AuditAction
 from app.modules.auth import repository as auth_repo
 from app.modules.auth.models import RevokeReason
 from app.modules.auth.service import CurrentUser
@@ -76,6 +78,10 @@ def to_out(employee: Employee) -> EmployeeOut:
         created_at=employee.created_at,
         updated_at=employee.updated_at,
     )
+
+
+# Yangi xodim yozuvida saqlanadigan maydonlar (to'liq qiymati bilan — qaror AU-013)
+_CREATED_FIELDS = ("first_name", "last_name", "birth_date", "gender", "phone", "role", "salary")
 
 
 class EmployeeService:
@@ -172,6 +178,11 @@ class EmployeeService:
                 valid_from=today(),
             )
         )
+        await self._record(
+            AuditAction.EMPLOYEE_CREATED,
+            employee,
+            changes={field: (None, getattr(employee, field)) for field in _CREATED_FIELDS},
+        )
         try:
             await self._session.commit()
         except Exception:
@@ -187,8 +198,14 @@ class EmployeeService:
         changes = data.model_dump(exclude_unset=True, exclude_none=True)
         if "phone" in changes:
             await self._ensure_phone_free(changes["phone"], exclude_id=employee.id)
+        diff: dict[str, tuple[object, object]] = {}
         for field, value in changes.items():
-            setattr(employee, field, getattr(value, "value", value))
+            new = getattr(value, "value", value)
+            if getattr(employee, field) != new:
+                diff[field] = (getattr(employee, field), new)
+                setattr(employee, field, new)
+        if diff:  # hech narsa o'zgarmagan bo'lsa — jurnalga ham yozilmaydi
+            await self._record(AuditAction.EMPLOYEE_PERSONAL_INFO_CHANGED, employee, changes=diff)
         await self._session.commit()
         await self._session.refresh(employee)
         return to_out(employee)
@@ -197,6 +214,7 @@ class EmployeeService:
         employee = await self._get(employee_id)
         self._require_manage(employee.role)
         old_path, employee.photo_path = employee.photo_path, photos.save_photo(photo)
+        await self._record(AuditAction.EMPLOYEE_PHOTO_CHANGED, employee)
         await self._session.commit()
         photos.delete_photo(old_path)
         await self._session.refresh(employee)
@@ -236,6 +254,17 @@ class EmployeeService:
                 )
             )
 
+        await self._record(
+            # Ikkalasi birga o'zgarsa — bitta yozuv, maosh uning ichida (AU-011)
+            AuditAction.EMPLOYEE_ROLE_CHANGED
+            if role_changed
+            else AuditAction.EMPLOYEE_SALARY_CHANGED,
+            employee,
+            changes={
+                "role": (employee.role, change.role.value),
+                "salary": (employee.salary, change.salary),
+            },
+        )
         employee.role, employee.salary = change.role.value, change.salary
         if role_changed:
             # Huquqlar o'zgardi → xodim qayta kirishi kerak (A-007)
@@ -251,6 +280,7 @@ class EmployeeService:
         if employee.archived_at is None:
             employee.archived_at = utcnow()
             await self._logout_everywhere(employee.id, RevokeReason.ACCOUNT_DISABLED)
+            await self._record(AuditAction.EMPLOYEE_ARCHIVED, employee)
             await self._session.commit()
             await self._session.refresh(employee)
         return to_out(employee)
@@ -261,6 +291,7 @@ class EmployeeService:
         if employee.archived_at is not None:
             await self._ensure_phone_free(employee.phone or "", exclude_id=employee.id)
             employee.archived_at = None
+            await self._record(AuditAction.EMPLOYEE_RESTORED, employee)
             await self._session.commit()
             await self._session.refresh(employee)
         return to_out(employee)
@@ -271,6 +302,7 @@ class EmployeeService:
         employee = await self._get(employee_id)
         self._require_manage(employee.role)
         old_photo = employee.photo_path
+        before = (employee.first_name, employee.last_name, employee.phone)
 
         accounts = await repo.accounts_of(self._session, employee.id)
         if not accounts:  # "tarix" = kamida bir marta login berilgan (keyin kengayadi)
@@ -287,10 +319,39 @@ class EmployeeService:
             employee.archived_at = employee.archived_at or now
             employee.anonymized_at = now
 
+        # Kim o'chirilgani jurnalda qoladi (qaror AU-013).
+        # Butunlay o'chirilganda yangi qiymat yo'q (None); anonimlashtirilganda — yangi nom.
+        after = (
+            (employee.first_name, employee.last_name, employee.phone) if accounts else (None,) * 3
+        )
+        await self._record(
+            AuditAction.EMPLOYEE_DELETED,
+            employee,
+            changes={
+                "first_name": (before[0], after[0]),
+                "last_name": (before[1], after[1]),
+                "phone": (before[2], after[2]),
+            },
+        )
         await self._session.commit()
         photos.delete_photo(old_photo)
 
     # ------------------------------------------------------------------ yordamchi
+    async def _record(
+        self,
+        action: AuditAction,
+        employee: Employee,
+        *,
+        changes: dict[str, tuple[object, object]] | None = None,
+    ) -> None:
+        await audit.record(
+            self._session,
+            actor=self._actor,
+            action=action,
+            entity=("employee", employee.id),
+            changes=changes,
+        )
+
     async def _logout_everywhere(self, employee_id: int, reason: RevokeReason) -> None:
         now = utcnow()
         for account in await repo.accounts_of(self._session, employee_id):

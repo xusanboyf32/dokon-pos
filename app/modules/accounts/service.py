@@ -24,6 +24,8 @@ from app.modules.accounts.schemas import (
     PasswordReset,
 )
 from app.modules.accounts.validation import normalize_username, validate_new_password
+from app.modules.audit import service as audit
+from app.modules.audit.catalog import AuditAction
 from app.modules.auth import repository as auth_repo
 from app.modules.auth.lockout import LoginGuard
 from app.modules.auth.models import RevokeReason
@@ -105,6 +107,23 @@ class AccountService:
         self._require_manage(account.employee.role)
         return account
 
+    async def _record(
+        self,
+        action: AuditAction,
+        account: UserAccount,
+        *,
+        changes: dict[str, tuple[object, object]] | None = None,
+        reason: str | None = None,
+    ) -> None:
+        await audit.record(
+            self._session,
+            actor=self._actor,
+            action=action,
+            entity=("account", account.id),
+            changes=changes,
+            reason=reason,
+        )
+
     async def _out(self, account: UserAccount) -> AccountOut:
         seconds = await self._guard.locked_seconds_left([account.username])
         return to_out(account, seconds.get(account.username))
@@ -156,6 +175,12 @@ class AccountService:
             employee_id=employee.id, username=username, password_hash=hash_password(password)
         )
         self._session.add(account)
+        await self._session.flush()  # account.id kerak
+        await self._record(
+            AuditAction.ACCOUNT_CREATED,
+            account,
+            changes={"username": (None, username), "employee_id": (None, employee.id)},
+        )
         await self._session.commit()
         return await self.get(account.id)
 
@@ -172,15 +197,23 @@ class AccountService:
         await auth_repo.revoke_active_sessions_of_account(
             self._session, account.id, RevokeReason.PASSWORD_CHANGED, utcnow()
         )
+        await self._record(AuditAction.ACCOUNT_PASSWORD_RESET, account)  # parolning o'zi — yo'q
         await self._session.commit()
         return await self._out(account)
 
-    async def unlock(self, account_id: int) -> AccountOut:
+    async def unlock(self, account_id: int, *, reason: str) -> AccountOut:
         """Doimiy blok ham, vaqtinchalik blok va hisoblagichlar ham tozalanadi (7e)."""
         account = await self._get_manageable(account_id)
         if account.deleted_at is not None:
             raise AccountDeletedError()
+        was_locked = account.locked_at is not None
         account.locked_at = None
+        await self._record(
+            AuditAction.ACCOUNT_UNLOCKED,
+            account,
+            changes={"permanently_locked": (was_locked, False)},
+            reason=reason,
+        )
         await self._session.commit()
         await self._guard.reset(account.username)
         return await self._out(account)
@@ -196,4 +229,5 @@ class AccountService:
         await auth_repo.revoke_active_sessions_of_account(
             self._session, account.id, RevokeReason.ACCOUNT_DISABLED, now
         )
+        await self._record(AuditAction.ACCOUNT_DELETED, account)
         await self._session.commit()

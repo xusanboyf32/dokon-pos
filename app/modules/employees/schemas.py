@@ -7,13 +7,13 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field, StringConstraints, field_validator
 
+from app.core.money import Money
 from app.core.roles import Role
 from app.core.time import to_tashkent, utcnow
 from app.modules.employees.models import Gender
 from app.modules.employees.phone import InvalidPhoneError, normalize_phone
 
 Name = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=100)]
-Money = Annotated[Decimal, Field(ge=0, max_digits=14, decimal_places=2)]
 
 
 class EmployeeStatus(StrEnum):

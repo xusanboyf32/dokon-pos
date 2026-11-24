@@ -7,6 +7,8 @@ from app.core.exceptions import ConflictError, NotFoundError
 from app.core.security import hash_password
 from app.modules.accounts.models import UserAccount
 from app.modules.accounts.validation import normalize_username, validate_new_password
+from app.modules.audit import service as audit
+from app.modules.audit.catalog import AuditAction
 from app.modules.auth.lockout import LoginGuard
 
 
@@ -34,6 +36,8 @@ async def create_superadmin(
         is_superadmin=True,
     )
     session.add(account)
+    await session.flush()
+    await _record(session, AuditAction.ACCOUNT_SUPERADMIN_CREATED, account)
     await session.commit()
     return account
 
@@ -43,6 +47,14 @@ async def unlock_superadmin(session: AsyncSession, guard: LoginGuard) -> UserAcc
     if account is None:
         raise NotFoundError("Superadmin topilmadi")
     account.locked_at = None
+    await _record(session, AuditAction.ACCOUNT_SUPERADMIN_UNLOCKED, account)
     await session.commit()
     await guard.reset(account.username)  # hamma hisoblagich 0 (7e)
     return account
+
+
+async def _record(session: AsyncSession, action: AuditAction, account: UserAccount) -> None:
+    """Server buyrug'i — aktyor "Tizim"; admin bu yozuvlarni ko'rmaydi (AU-001)."""
+    await audit.record(
+        session, actor=None, action=action, entity=("account", account.id), concerns_superadmin=True
+    )

@@ -93,7 +93,7 @@ Partial unique index: xodimda `valid_to IS NULL` davr bittadan ko'p bo'lmaydi.
 | POST | /api/v1/accounts | superadmin, admin | login yaratish: `employee_id`, `username`, `password`, `password_confirm` (A-027, A-028) |
 | GET | /api/v1/accounts/{id} | superadmin, admin | login kartochkasi |
 | POST | /api/v1/accounts/{id}/reset-password | superadmin, admin | yangi parol + tasdiqlash; barcha sessiyalar yopiladi |
-| POST | /api/v1/accounts/{id}/unlock | superadmin, admin | doimiy va vaqtincha blokni ochish |
+| POST | /api/v1/accounts/{id}/unlock | superadmin, admin | doimiy va vaqtincha blokni ochish; `reason` majburiy (AU-014) |
 | DELETE | /api/v1/accounts/{id} | superadmin, admin | loginni o'chirish (qaytarilmaydi, A-029; xodim va tarix qoladi) |
 
 Admin uchun barcha endpoint'larda: superadmin ko'rinmaydi va o'zgartirilmaydi; admin akkauntlari o'zgartirilmaydi.

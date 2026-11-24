@@ -140,3 +140,30 @@ async def api(
     transport = ASGITransport(app=app, raise_app_exceptions=False)
     async with AsyncClient(transport=transport, base_url="http://test") as client:
         yield client
+
+
+# ------------------------------------------------------------------ audit uchun aktyor
+@pytest.fixture
+async def actor_account_id(db_session: AsyncSession) -> int:
+    """Servis testlarida "kim qildi" — bazadagi haqiqiy akkaunt bo'lishi shart.
+
+    Audit jurnali `actor_account_id` ni FK bilan tekshiradi (soxta id=0 o'tmaydi).
+    Xodim anonimlashtirilgan — hech qaysi ro'yxatda ko'rinmaydi va testlarga xalaqit bermaydi.
+    """
+    from app.core.time import utcnow
+    from app.modules.accounts.models import UserAccount
+    from tests.integration.test_employees_table import make_employee
+    from tests.integration.test_user_accounts_table import FAKE_HASH
+
+    now = utcnow()
+    employee = make_employee(
+        role="admin", phone=None, photo_path=None, archived_at=now, anonymized_at=now
+    )
+    db_session.add(employee)
+    await db_session.flush()
+    account = UserAccount(
+        employee_id=employee.id, username="audit_actor", password_hash=FAKE_HASH, deleted_at=now
+    )
+    db_session.add(account)
+    await db_session.flush()
+    return account.id

@@ -17,6 +17,7 @@ Muhimlik katalogdan olinadi — chaqiruvchi bermaydi.
 """
 
 from collections.abc import Mapping
+from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
@@ -45,6 +46,14 @@ class Actor(Protocol):
 
     @property
     def role(self) -> Role: ...
+
+
+@dataclass(frozen=True, slots=True)
+class ActorRef:
+    """`CurrentUser` hali yo'q joylar uchun (masalan, login paytida — aktyor akkauntning o'zi)."""
+
+    account_id: int
+    role: Role
 
 
 class ReasonRequiredError(AppError):
