@@ -24,6 +24,9 @@ ombor, buxgalteriya (kassadan pul qabul qilish), qarzlar, ta'minotchilar, xodiml
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Qabul qilingan barcha qarorlar va ochiq savollar |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Modullar ketma-ketligi va holati |
 | [docs/modules/auth.md](docs/modules/auth.md) | Auth moduli to'liq spetsifikatsiyasi |
+| [docs/modules/audit.md](docs/modules/audit.md) | Audit jurnali: qoidalar, katalog, API |
+| [docs/modules/problems.md](docs/modules/problems.md) | 🔔 Muammolar: 5 qoida, turlar, API |
+| [docs/QOLDA_TEKSHIRUV.md](docs/QOLDA_TEKSHIRUV.md) | Qo'lda tekshiruv ro'yxati (Swagger va frontend uchun) |
 
 ## Ishga tushirish (lokal)
 

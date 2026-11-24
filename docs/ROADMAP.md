@@ -7,7 +7,7 @@ Har bir bosqich `ENGINEERING.md` dagi "tayyor" mezonidan o'tgandagina yopiladi.
 | 0 | Hujjatlar | README, CLAUDE.md, ARCHITECTURE, ENGINEERING, API_CONVENTIONS, DECISIONS | ✅ |
 | 1 | Skelet | uv + pyproject, config, async DB, logging, xato formati, `/health`, Alembic, pytest, CI | ✅ |
 | 2 | Auth | employees, accounts, sessions, login/refresh/logout, blok (10 ta xato, bazada — A-032), ruxsatlar, CLI, Xodimlar/Parollar CRUD | ✅ |
-| 3 | Audit va Muammolar | audit jurnali, filtrlar, superadmin yashirinligi; 🔔 Muammolar (N-001…N-005), birinchi tur — akkaunt bloklandi | ⬜ |
+| 3 | Audit va Muammolar | audit jurnali (trigger, katalog, filtrlar, cursor, o'zbekcha matn), xodim "Tarix"i, "Mening sahifam"; blok tizimi soddalashtirildi (A-032, Redis'siz); 🔔 Muammolar (birinchi tur — akkaunt bloklandi) | ✅ |
 | 4 | Katalog | brend, kategoriya, birlik, mahsulot (pg_trgm qidiruv), narx tarixi (C-001) | ⬜ |
 | 5 | Ta'minotchilar | ta'minotchilar, ularning akkauntlari | ⬜ |
 | 6 | Ombor | kirim, yaroqlilik muddati, do'konga jo'natish, qaytarish | ⬜ |
