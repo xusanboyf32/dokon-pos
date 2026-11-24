@@ -135,6 +135,9 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | AU-014 | Blokni ochish API'si sababni majburiy qabul qiladi: `POST /accounts/{id}/unlock` `{"reason": "..."}` (AU-006) |
 | AU-015 | Jurnalga yoziladigan joylar: login, vaqtincha/doimiy blok (faqat mavjud akkaunt uchun), refresh token o'g'irligi; Parollar (yaratish, parol, blok ochish, o'chirish); Xodimlar (qo'shish, shaxsiy ma'lumot, rasm, lavozim/maosh, arxiv, qaytarish, o'chirish); superadmin CLI. Refresh va logout yozilmaydi. Hech narsa o'zgarmagan takroriy so'rov yozilmaydi |
 | AU-016 | Pul API'ga kirishda doim 2 xonaga keltiriladi (`core/money.py` → `Money`): "4500000" → "4500000.00". Baza, javob va jurnalda bir xil ko'rinish |
+| AU-017 | O'zbekcha matnni (`summary`) **backend** yasaydi va xom ma'lumot (`action`, `changes`) bilan birga qaytaradi. Sabab: tizim bir tilli (ko'p tillilik — "Kerak emas"), mijozlar ko'p bo'lishi mumkin (veb, mobil, Telegram) — qoidalar bitta joyda. Ismlar 2 ta so'rov bilan olinadi (N+1 yo'q) |
+| AU-018 | `GET /audit-logs` — cursor pagination (`limit` ≤ 100, `next_cursor`, `has_more`), eng yangisi tepada. Filtrlar birga (VA) qo'llanadi: sana oralig'i (Toshkent), kim qildi (xodim), bo'lim, amal turlari (bir nechta), muhimlik (standart important+), ob'ekt |
+| AU-019 | Xodim kartochkasidagi "Tarix": xodimning o'ziga va uning login(lar)iga oid barcha yozuvlar, bitta ro'yxatda, muhimlik filtrisiz. Faqat tizimga kirishlar standart yashirin ("Kirishlarni ko'rsatish"). "Amallari" — umumiy jurnal `actor_employee_id` filtri bilan |
 
 ## Muammolar (admin bildirishnomalari)
 

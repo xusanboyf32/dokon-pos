@@ -26,11 +26,14 @@ from typing import Any, Protocol
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import AppError
+from app.core.pagination import CursorPage, CursorParams, encode_cursor
 from app.core.request_context import current_request
 from app.core.roles import Role
 from app.modules.audit import repository
-from app.modules.audit.catalog import AuditAction, spec_of
+from app.modules.audit.catalog import AuditAction, Severity, spec_of
 from app.modules.audit.models import AuditEvent
+from app.modules.audit.schemas import AuditActorOut, AuditEventOut, AuditFilters
+from app.modules.audit.summary import SYSTEM_NAME, build_summary
 
 REASON_MAX_LENGTH = 500
 
@@ -134,3 +137,107 @@ async def record(
         kassa_id=kassa_id,
     )
     return await repository.add(session, event)
+
+
+# ================================================================== o'qish (GET /audit-logs)
+class AuditService:
+    """Jurnalni o'qish. `viewer` — kim ko'ryapti (admin superadmin yozuvlarini ko'rmaydi).
+
+    `CurrentUser` emas, `Actor` turi: auth moduli audit'ni import qiladi, audit esa auth'ni
+    import qilsa — aylanma import (circular import) bo'lardi.
+    """
+
+    def __init__(self, session: AsyncSession, viewer: Actor) -> None:
+        self._session = session
+        self._viewer = viewer
+
+    async def search(self, filters: AuditFilters, page: CursorParams) -> CursorPage[AuditEventOut]:
+        rows = await repository.search(
+            self._session,
+            filters,
+            page,
+            include_superadmin_only=self._viewer.role == Role.SUPERADMIN,
+        )
+        has_more = len(rows) > page.limit
+        rows = rows[: page.limit]
+        items = await self._to_out(rows)
+        last = rows[-1] if rows and has_more else None
+        return CursorPage[AuditEventOut](
+            items=items,
+            next_cursor=encode_cursor(last.occurred_at, last.id) if last else None,
+            has_more=has_more,
+        )
+
+    async def _to_out(self, rows: list[AuditEvent]) -> list[AuditEventOut]:
+        # Ismlar 2 ta so'rov bilan olinadi — yozuvlar soni qancha bo'lmasin (N+1 yo'q)
+        account_ids = {r.actor_account_id for r in rows if r.actor_account_id is not None}
+        account_ids |= {r.entity_id for r in rows if r.entity_type == "account"}
+        employee_ids = {r.entity_id for r in rows if r.entity_type == "employee"}
+        accounts = await repository.account_names(self._session, account_ids)
+        employees = await repository.employee_names(self._session, employee_ids)
+
+        def account_label(account_id: int) -> str:
+            info = accounts.get(account_id)
+            if info is None:
+                return f"akkaunt #{account_id}"
+            if info.is_superadmin:
+                return "Superadmin"
+            owner = f" ({info.owner_name})" if info.owner_name else ""
+            return f"login «{info.username}»{owner}"
+
+        def actor_name(account_id: int) -> str:
+            info = accounts.get(account_id)
+            if info is None:
+                return f"akkaunt #{account_id}"
+            if info.is_superadmin:
+                return "Superadmin"
+            return info.owner_name or info.username
+
+        def entity_name(row: AuditEvent) -> str:
+            if row.entity_type == "employee":
+                return employees.get(row.entity_id, f"O'chirilgan xodim #{row.entity_id}")
+            if row.entity_type == "account":
+                return account_label(row.entity_id)
+            return f"{row.entity_type} #{row.entity_id}"
+
+        result = []
+        for row in rows:
+            action = AuditAction(row.action)
+            label = spec_of(action).label
+            who = actor_name(row.actor_account_id) if row.actor_account_id else SYSTEM_NAME
+            target = entity_name(row)
+            result.append(
+                AuditEventOut(
+                    id=row.id,
+                    occurred_at=row.occurred_at,
+                    severity=Severity(row.severity),
+                    action=action,
+                    action_label=label,
+                    actor=(
+                        AuditActorOut(
+                            account_id=row.actor_account_id,
+                            name=who,
+                            role=Role(row.actor_role),
+                        )
+                        if row.actor_account_id is not None and row.actor_role is not None
+                        else None
+                    ),
+                    entity_type=row.entity_type,
+                    entity_id=row.entity_id,
+                    entity_name=target,
+                    changes=row.changes,
+                    reason=row.reason,
+                    summary=build_summary(
+                        actor_name=who,
+                        action_label=label,
+                        entity_name=target,
+                        changes=row.changes,
+                        reason=row.reason,
+                        self_action=(
+                            row.entity_type == "account" and row.entity_id == row.actor_account_id
+                        ),
+                    ),
+                    ip=row.ip,
+                )
+            )
+        return result
