@@ -46,14 +46,14 @@ Indekslar: `(occurred_at, id)`, `(entity_type, entity_id, occurred_at)`, `(actor
 ```python
 await audit.record(
     session,
-    actor=current_user,              # None → "Tizim"
+    actor=current_user,  # None → "Tizim"
     action=AuditAction.EMPLOYEE_SALARY_CHANGED,
     entity=("employee", employee.id),
     changes={"salary": (old, new)},  # o'zgarmaganlar o'zi tashlanadi
-    reason=None,                     # katalog majburiy desa — ReasonRequiredError
+    reason=None,  # katalog majburiy desa — ReasonRequiredError
     concerns_superadmin=False,
 )
-await session.commit()               # amal bilan birga
+await session.commit()  # amal bilan birga
 ```
 
 ## 4. Katalog (hozirgi amallar)
