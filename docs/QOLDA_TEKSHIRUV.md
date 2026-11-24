@@ -21,7 +21,9 @@ Xato javobi doim bir xil shaklda keladi:
       (8000 band bo'lsa: `--port 8001`)
 - [ ] `GET /health` → `{"status": "ok", "database": "ok"}`
 - [ ] Superadmin yo'q bo'lsa: `uv run python -m app.cli create-superadmin`
-- [ ] Sinov uchun yarating: 1 ta **admin** xodim + login, 2 ta **kassir** xodim + login
+- [ ] Sinov ma'lumoti: `uv run python -m scripts.seed_demo` — yaratadi:
+      `admin1` / `admin123` (Ali Valiyev, admin), `kassir1` / `1234` (Anvar Karimov),
+      `kassir2` / `1234` (Vali Rahimov). Qayta ishga tushirish xavfsiz
 - [ ] Swagger'da token: `POST /auth/login` → `access_token` → **Authorize 🔒**
 
 Redis va Docker **kerak emas** (A-032).
@@ -59,7 +61,8 @@ Redis va Docker **kerak emas** (A-032).
 
 | # | Holat | Kutilgan natija | Jurnalda | 🔔 |
 |---|---|---|---|---|
-| 2.1 | [ ] `POST /accounts/{id}/unlock` — body'siz yoki `{"reason": ""}` yoki `{"reason": "   "}` | 422 `VALIDATION_ERROR` — "Ma'lumotlar noto'g'ri", `details.fields` da `reason` | yo'q | o'zgarmaydi |
+| 2.1 | [ ] `POST /accounts/{id}/unlock` — body `{}` / `{"reason": ""}` / `{"reason": "   "}` | 422 `VALIDATION_ERROR` — "Ma'lumotlar noto'g'ri"; `reason` maydoni: "Bu maydon majburiy" / "Juda qisqa" / "Sabab bo'sh bo'lmasligi kerak" | yo'q | o'zgarmaydi |
+| 2.1a | [ ] Body'da buzuq JSON (masalan, qavs yopilmagan) | 422 `INVALID_JSON` — "So'rov matni noto'g'ri yozilgan (JSON). Qavslar, qo'shtirnoq va vergullarni tekshiring" | — | — |
 | 2.2 | [ ] `{"reason": "Parolini unutgan"}` | 200, `state: "active"`, `failed_attempts: 0` | 🔴 "Ali Valiyev: blok ochildi — login «anvar» (Anvar Karimov). Doimiy blok: ha → yo'q. Sabab: Parolini unutgan" | **−1**; `status=resolved` ro'yxatida: `resolution: "auto"`, `resolved_by` — admin |
 | 2.3 | [ ] Blok ochilgach to'g'ri parol | 200 | 🟢 | — |
 | 2.4 | [ ] Admin boshqa **admin**ning blokini ochmoqchi | 403 `FORBIDDEN` — "Bu lavozimdagi xodimning loginini boshqarishga ruxsatingiz yo'q" | — | — |
@@ -184,6 +187,9 @@ Redis va Docker **kerak emas** (A-032).
 Sana: ____________  Tekshirdi: ____________
 
 Topilgan muammolar:
-1.
+1. ✅ TUZATILDI (24.11.2026, Swagger sinovida topildi): buzuq JSON yuborilganda
+   `"field": "14", "message": "JSON decode error"` chiqardi — tushunarsiz.
+   Endi: 422 `INVALID_JSON` + o'zbekcha xabar. Pydantic'ning inglizcha xabarlari ham
+   o'zbekchaga o'girildi ("Field required" → "Bu maydon majburiy").
 2.
 3.
