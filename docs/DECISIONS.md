@@ -138,6 +138,7 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | AU-017 | O'zbekcha matnni (`summary`) **backend** yasaydi va xom ma'lumot (`action`, `changes`) bilan birga qaytaradi. Sabab: tizim bir tilli (ko'p tillilik — "Kerak emas"), mijozlar ko'p bo'lishi mumkin (veb, mobil, Telegram) — qoidalar bitta joyda. Ismlar 2 ta so'rov bilan olinadi (N+1 yo'q) |
 | AU-018 | `GET /audit-logs` — cursor pagination (`limit` ≤ 100, `next_cursor`, `has_more`), eng yangisi tepada. Filtrlar birga (VA) qo'llanadi: sana oralig'i (Toshkent), kim qildi (xodim), bo'lim, amal turlari (bir nechta), muhimlik (standart important+), ob'ekt |
 | AU-019 | Xodim kartochkasidagi "Tarix": xodimning o'ziga va uning login(lar)iga oid barcha yozuvlar, bitta ro'yxatda, muhimlik filtrisiz. Faqat tizimga kirishlar standart yashirin ("Kirishlarni ko'rsatish"). "Amallari" — umumiy jurnal `actor_employee_id` filtri bilan |
+| AU-020 | "Mening sahifam": xodim faqat o'zining lavozim va maosh tarixini ko'radi (`GET /auth/me/positions`, `employee_positions` jadvalidan). Audit jurnalini ko'rmaydi — unda admin ismi, IP va sabablar bor |
 
 ## Muammolar (admin bildirishnomalari)
 
@@ -169,7 +170,8 @@ dashboard grafiklari, audit jurnali uchun hash zanjiri (o'chirilgan qatorni aniq
 
 Avtomobil/avtoraqam modullari, operator va programist rollari, fiskal chek, smena moduli,
 sodiqlik ballari, kredit limiti, ko'p tillilik, ulgurji narx, qarzni hisobdan chiqarish,
-qo'lda qoldiq tuzatish, zaxira nusxa UI (zaxira nusxaning o'zi majburiy — O-001), SMS.
+qo'lda qoldiq tuzatish, zaxira nusxa UI (zaxira nusxaning o'zi majburiy — O-001), SMS,
+xodimlarning foizli "intizom ko'rsatkichi" (zaryad/batareya ko'rinishidagi reyting).
 
 ---
 

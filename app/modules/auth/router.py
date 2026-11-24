@@ -1,12 +1,16 @@
 """Auth endpoint'lari. Router faqat HTTP bilan ishlaydi — mantiq service'da."""
 
 from fastapi import APIRouter, Cookie, Depends, Request, Response, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.database import get_session
 from app.modules.auth.dependencies import get_auth_service, get_current_user
 from app.modules.auth.exceptions import SessionInvalidError
 from app.modules.auth.schemas import LoginRequest, MeResponse, TokenResponse
 from app.modules.auth.service import AuthService, CurrentUser, TokenPair
+from app.modules.employees.schemas import PositionOut
+from app.modules.employees.service import EmployeeService
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -83,3 +87,20 @@ async def logout(
 @router.get("/me", response_model=MeResponse, summary="Men kimman")
 async def me(user: CurrentUser = Depends(get_current_user)) -> MeResponse:
     return MeResponse(account_id=user.account_id, role=user.role, employee_id=user.employee_id)
+
+
+@router.get(
+    "/me/positions", response_model=list[PositionOut], summary="Mening lavozim va maosh tarixim"
+)
+async def my_positions(
+    user: CurrentUser = Depends(get_current_user),
+    session: AsyncSession = Depends(get_session),
+) -> list[PositionOut]:
+    """ "Mening sahifam": xodim faqat o'zining lavozim/maosh davrlarini ko'radi (AU-020).
+
+    Audit jurnali emas — unda kim, qaysi IP'dan, qanday sabab bilan qilgani bor.
+    Superadmin xodim emas — ro'yxat bo'sh.
+    """
+    if user.employee_id is None:
+        return []
+    return await EmployeeService(session, user).positions(user.employee_id)

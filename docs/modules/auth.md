@@ -81,6 +81,7 @@ Partial unique index: xodimda `valid_to IS NULL` davr bittadan ko'p bo'lmaydi.
 | POST | /api/v1/auth/refresh | cookie egasi | yangi access + yangi refresh (rotation) |
 | POST | /api/v1/auth/logout | login bo'lgan | joriy sessiyani yopadi |
 | GET | /api/v1/auth/me | login bo'lgan | o'z profili |
+| GET | /api/v1/auth/me/positions | login bo'lgan | o'z lavozim va maosh tarixi (AU-020); superadmin uchun bo'sh |
 | GET | /api/v1/roles | superadmin, admin | lavozimlar ma'lumotnomasi (xodimlar soni bilan) |
 | GET | /api/v1/employees | superadmin, admin | ro'yxat: `status` (active/archived), `search`, `role`, `created_from/to`, `page`, `size` |
 | POST | /api/v1/employees | superadmin, admin | yaratish (multipart forma + `photo`) |
