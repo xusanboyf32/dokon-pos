@@ -10,6 +10,8 @@ from uuid import uuid4
 import structlog
 from fastapi import Request, Response
 
+from app.core.request_context import RequestContext, set_request_context
+
 log = structlog.get_logger()
 
 
@@ -18,6 +20,13 @@ async def request_context_middleware(
 ) -> Response:
     request_id = request.headers.get("X-Request-ID") or uuid4().hex
     request.state.request_id = request_id
+    set_request_context(
+        RequestContext(
+            request_id=request_id[:64],  # mijoz juda uzun ID yuborsa ham ustunga sig'adi
+            ip=request.client.host if request.client else None,
+            user_agent=(request.headers.get("user-agent") or "")[:255] or None,
+        )
+    )
 
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(

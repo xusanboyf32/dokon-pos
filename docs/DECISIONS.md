@@ -115,6 +115,23 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | B-004 | "Katta kassir" vazifasini buxgalter roli bajaradi: kassadagi pulni sanab qabul qiladi, pul avtomatik seyfga o'tadi (alohida rol qo'shilmaydi — R-001) |
 | P-001 | Oylik: ishlangan kunlar, kunlik soat, oylik, bonus, jarima — admin kiritadi |
 
+## Audit jurnali
+
+| # | Qaror |
+|---|---|
+| AU-001 | Jurnalni superadmin va admin ko'radi. Admin superadminning amallarini va superadminga oid yozuvlarni ko'rmaydi (R-003) |
+| AU-002 | Faqat o'zgargan maydonlar yoziladi: `{"maydon": [eski, yangi]}`. Parol, hash va tokenlar hech qachon yozilmaydi — faqat "parol almashtirildi" |
+| AU-003 | Jurnal doimiy saqlanadi, o'chirilmaydi (D-010). Hajm oshsa — oylar bo'yicha partitioning, o'chirish emas |
+| AU-004 | Har bir xato login jurnalga yozilmaydi (faqat structlog). Jurnalga: muvaffaqiyatli login, vaqtincha/doimiy blok, blokni ochish. Sabab: A-025 tufayli begona odam jurnalni "spam" bilan to'ldira oladi |
+| AU-005 | 3 ta muhimlik darajasi: info / important / critical. Jurnal standart filtri — important va undan yuqori |
+| AU-006 | Sezgir amallarda sabab majburiy (blokni ochish, kassani majburan bo'shatish, katta chegirma va h.k.). Qaysi amalda majburiyligi katalogda belgilanadi |
+| AU-007 | Oddiy savdo auditga yozilmaydi — chekning o'zi o'zgarmas hujjat. Yoziladi: chegirma, qaytarish, qo'lda narx o'zgartirish |
+| AU-008 | Amallar qat'iy katalogda (`AuditAction`): har amalda nom (`employee.salary_changed`), muhimlik, sabab majburiyligi, o'zbekcha matn shabloni. Umumiy nomlar (`*.updated`) ishlatilmaydi |
+| AU-009 | Yozuv amal bilan bitta tranzaksiyada saqlanadi. Audit yozib bo'lmasa — amal ham bekor (fail-closed; A-024 ning teskarisi, chunki bu nazorat vositasi) |
+| AU-010 | Baza darajasida trigger UPDATE, DELETE va TRUNCATE ni taqiqlaydi. Noto'g'ri yozuv tahrirlanmaydi — ustiga tuzatuvchi yangi yozuv qo'shiladi (storno kabi) |
+| AU-011 | Bitta biznes-amal = bitta yozuv (masalan, 20 qatorli chek uchun 20 ta emas, bitta yozuv) |
+| AU-012 | Har sezgir endpoint uchun test: "amal bajarildi → aynan shu `action` bilan yozuv bor" |
+
 ## Muammolar (admin bildirishnomalari)
 
 | # | Qaror |
@@ -124,6 +141,8 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 | N-003 | Muammo sababi bartaraf etilganda O'ZI yopiladi (masalan blok ochilganda). Yopilganlar o'chirilmaydi — tarixda: kim, qachon hal qildi |
 | N-004 | Filtrlar: holat (ochiq — standart / hal qilingan / hammasi), tur, sana oralig'i, xodim; eng yangisi tepada; pagination. Har yozuvda tezkor amal tugmasi (masalan "Blokni ochish") |
 | N-005 | Muammo turlari har modulda qo'shib boriladi. Hozirgi ro'yxat: akkaunt bloklandi (auth); 10 000 so'mdan katta chegirma (kassa). Rejada: kamomad, yaroqlilik muddati, qoldiq tugashi, qaytarishlar ko'payishi |
+| N-006 | Muammo turiga qarab yopiladi: sababi texnik bo'lsa (blok) — o'zi yopiladi; odam qarori kerak bo'lsa (katta chegirma) — faqat admin "Asosli / Asossiz" + izoh bilan yopadi. Yopish ham auditga yoziladi |
+| N-007 | *(Kassa'da yakunlanadi)* Katta chegirma: savdo to'xtamaydi, sabab majburiy, keyin admin ko'radi (oldindan PIN-tasdiq emas). Chegara: summa **yoki** foiz (masalan 10 000 so'm yoki 10%), qiymati sozlamada |
 
 ## Operatsion va nazorat talablari
 
@@ -137,7 +156,7 @@ Har bir qaror raqamlangan. Qaror o'zgarsa — eski yozuv o'chirilmaydi, "O'zgart
 
 Keyinroq ko'rib chiqiladi (hozir rejada emas): kassa ekranini PIN bilan qulflash, faol sessiyalar sahifasi,
 rasmiy hujjatlar (logo, STIR, QR, PDF), versiyalar va CHANGELOG, Excel eksport, Telegram bildirishnomalari,
-dashboard grafiklari.
+dashboard grafiklari, audit jurnali uchun hash zanjiri (o'chirilgan qatorni aniqlash).
 
 ## Kerak emas (ataylab chiqarilgan)
 

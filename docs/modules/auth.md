@@ -108,7 +108,7 @@ Admin uchun barcha endpoint'larda: superadmin ko'rinmaydi va o'zgartirilmaydi; a
 5. Xato → Redis hisoblagichlari oshadi; chegaradan oshsa blok qo'yiladi → 401.
 6. To'g'ri → hisoblagichlar tozalanadi; kassir bo'lsa eski sessiyalari yopiladi (A-014);
    yangi sessiya; access token (15 daq) + refresh cookie (24 soat) + rol qaytadi.
-7. Audit: `auth.login_success` / `auth.login_failed` / `auth.locked`.
+7. Audit: `auth.login_success` / `auth.locked_temporary` / `auth.locked_permanent`. Har bir xato urinish faqat structlog'ga yoziladi (AU-004).
 
 ### Har so'rov
 Access token tekshiriladi → akkaunt mavjud, o'chirilmagan, bloklanmagan → xodim faol →
